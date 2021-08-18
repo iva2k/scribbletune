@@ -46,6 +46,14 @@ export class Session {
     return this.sessionChannels;
   }
 
+  startTransport(): void {
+    Channel.startTransport();
+  }
+
+  stopTransport(): void {
+    Channel.stopTransport();
+  }
+
   // Start the clips at a specific index in all the channels
   startRow(idx: number) {
     this.sessionChannels.forEach((ch: any) => {

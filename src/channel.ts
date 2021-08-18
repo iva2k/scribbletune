@@ -72,6 +72,15 @@ export class Channel {
     return this.channelClips;
   }
 
+  static startTransport(): void {
+    Tone.start();
+    Tone.Transport.start(); // TODO: Maybe use Tone.Transport.start("+0.1"); for setting lookAhead value.
+  }
+
+  static stopTransport(): void {
+    Tone.Transport.stop();
+  }
+
   startClip(idx: number) {
     // Stop any other currently running clip
     if (this.activePatternIdx > -1 && this.activePatternIdx !== idx) {
