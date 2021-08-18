@@ -122,6 +122,12 @@ interface ClipParams {
    *  - See:  https://tonejs.github.io/docs/13.8.25/Player
    */
   player?: any;
+
+  /**
+   * External sound producer object / module
+   */
+  external?: any;
+
   /**
    * The duration of an individual sample that is used in a browser `clip`.
    *  - Example: `'32n'`, `'1m'`, `2.3`
@@ -163,6 +169,10 @@ interface ClipParams {
    * Callback function triggered when offline rendering is finished. Ignored when `offlineRendering: false`.
    */
   offlineRenderingCallback?: any;
+
+  // Fields inherited from Channel:
+  idx?: number | string;
+  name?: string;
 }
 
 interface ChannelParams extends ClipParams {
@@ -211,8 +221,8 @@ interface PlayParams {
 
 type SeqFn = (time: string, el: string) => void;
 
-declare var Tone: any;
-declare var LiveAPI: any;
-declare var require: NodeRequire;
+declare let Tone: any;
+declare let LiveAPI: any;
+declare let require: NodeRequire;
 declare module 'jsmidgen';
 declare module 'harmonics';

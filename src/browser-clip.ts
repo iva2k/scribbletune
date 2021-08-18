@@ -84,13 +84,25 @@ const getDuration = (params: ClipParams, counter: number) => {
 
 /**
  * @param  {Object}
+ * @param  {Object} AudioContext Context from Tone.js
  * @return {Function}
  * Take an object literal which has a Tone.js instrument and return a function that can be used
  * as the callback in Tone.Sequence https://tonejs.github.io/docs/Sequence
  */
 const getSeqFn = (params: ClipParams): SeqFn => {
   let counter = 0;
-  if (params.instrument instanceof Tone.Player) {
+  if (params.external) {
+    return (time: string, el: string) => {
+      if (el === 'x' || el === 'R') {
+        params.external?.triggerAttackRelease(
+          getNote(el, params, counter)[0],
+          getDuration(params, counter),
+          time
+        );
+        counter++;
+      }
+    };
+  } else if (params.instrument instanceof Tone.Player) {
     return (time: string, el: string) => {
       if (el === 'x' || el === 'R') {
         params.instrument.start(time);
@@ -170,9 +182,12 @@ const generateSequence = (params: ClipParams, context?: any) => {
     !params.buffer &&
     !params.synth &&
     !params.sampler &&
-    !params.samples
+    !params.samples &&
+    !params.external
   ) {
-    throw new Error('No player or instrument provided!');
+    throw new Error(
+      'One of required player|instrument|sample|sampler|samples|buffer|external is not provided!'
+    );
   }
 
   if (!params.durations && !params.dur) {
@@ -193,12 +208,14 @@ const generateSequence = (params: ClipParams, context?: any) => {
   let effects = [];
 
   const createEffect = (eff: any) => {
-    const effect: any =
-      typeof eff === 'string'
-        ? new Tone[eff]({ context })
-        : eff.context !== context
-        ? recreateToneObjectInContext(eff, context)
-        : eff;
+    let effect: any;
+    if (typeof eff === 'string') {
+      effect = new Tone[eff]({ context });
+    } else if (eff.context !== context) {
+      effect = recreateToneObjectInContext(eff, context);
+    } else {
+      effect = eff;
+    }
     return effect.toDestination();
   };
 
@@ -220,23 +237,25 @@ const generateSequence = (params: ClipParams, context?: any) => {
     );
   }
 
-  params.instrument =
-    params.sample || params.buffer
-      ? new Tone.Player({
-          url: params.sample || params.buffer,
-          context,
-        })
-      : params.sampler
-      ? params.sampler
-      : params.player
-      ? params.player
-      : params.samples
-      ? new Tone.Sampler({ url: params.samples, context })
-      : typeof params.instrument === 'string'
-      ? new Tone[params.instrument]({ context })
-      : params.instrument;
+  if (params.sample || params.buffer) {
+    params.instrument = new Tone.Player({
+      url: params.sample || params.buffer,
+      context,
+    });
+  } else if (params.sampler) {
+    params.instrument = params.sampler;
+  } else if (params.player) {
+    params.instrument = params.player;
+  } else if (params.samples) {
+    params.instrument = new Tone.Sampler({ url: params.samples, context });
+  } else if (typeof params.instrument === 'string') {
+    params.instrument = new Tone[params.instrument]({ context });
+  } else if (params.external) {
+    params.instrument = { context, volume: { value: 0 } };
+  }
+  // else { params.instrument = params.instrument; }
 
-  if (params.instrument.context !== context) {
+  if (!params.external && params.instrument.context !== context) {
     params.instrument = recreateToneObjectInContext(params.instrument, context);
   }
 
@@ -244,7 +263,30 @@ const generateSequence = (params: ClipParams, context?: any) => {
     params.instrument.volume.value = params.volume;
   }
 
-  params.instrument.chain(...effects).toDestination();
+  if (params.external) {
+    if (effects.length !== 0) {
+      throw new Error('Effects cannot be used with external output');
+    }
+  } else {
+    params.instrument.chain(...effects).toDestination();
+  }
+
+  if (params.external) {
+    params.external
+      ?.init(context.rawContext)
+      .then(() => {
+        console.log(
+          'Loaded external output module for channel idx %s %s',
+          params?.idx,
+          params?.name
+        );
+      })
+      .catch((e: any) => {
+        throw new Error(
+          `${e.message} loading external output module of channel idx ${params?.idx}, ${params?.name}`
+        );
+      });
+  }
 
   return new Tone.Sequence({
     callback: getSeqFn(params),
@@ -369,7 +411,7 @@ export const clip = (params: ClipParams) => {
 
   if (/[^x\-_\[\]R]/.test(params.pattern)) {
     throw new TypeError(
-      `pattern can only comprise x - _ [ ], found ${params.pattern}`
+      `pattern can only comprise x - _ [ ] R, found ${params.pattern}`
     );
   }
 

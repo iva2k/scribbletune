@@ -35,6 +35,7 @@ export class Channel {
   player: any;
   instrument: any;
   sampler: any;
+  external: any;
 
   constructor(params: ChannelParams) {
     (this.idx = params.idx || 0), (this.activePatternIdx = -1);
@@ -49,6 +50,9 @@ export class Channel {
       }
       if (params.samples) {
         this.sampler = new Tone.Sampler(params.samples);
+      }
+      if (params.external) {
+        this.external = params.external;
       }
     } catch (e) {
       throw new Error(`${e.message} in channel ${this.idx} "${params?.name}"`);
