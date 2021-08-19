@@ -71,81 +71,16 @@ const convertChordsToNotes = (el: any) => {
 
 const random = (num = 1) => Math.round(Math.random() * num);
 
-const getNote = (el: string, params: ClipParams, counter: number) => {
+export const getNote = (el: string, params: ClipParams, counter: number) => {
   return el === 'R' && params.randomNotes
     ? params.randomNotes[random(params.randomNotes.length - 1)]
     : params.notes[counter % params.notes.length];
 };
 
-const getDuration = (params: ClipParams, counter: number) => {
+export const getDuration = (params: ClipParams, counter: number) => {
   return params.durations
     ? params.durations[counter % params.durations.length]
     : params.dur || params.subdiv || defaultDur;
-};
-
-/**
- * @param  {Object}
- * @param  {Object} Channel to send output to
- * @return {Function}
- * Take an object literal which has a Tone.js instrument and return a function that can be used
- * as the callback in Tone.Sequence https://tonejs.github.io/docs/Sequence
- */
-const getSeqFn = (params: ClipParams, channel: Channel): SeqFn => {
-  let counter = 0;
-  if (channel.external) {
-    return (time: string, el: string) => {
-      if (el === 'x' || el === 'R') {
-        channel.external?.triggerAttackRelease(
-          getNote(el, params, counter)[0],
-          getDuration(params, counter),
-          time
-        );
-        counter++;
-      }
-    };
-  } else if (channel.instrument instanceof Tone.Player) {
-    return (time: string, el: string) => {
-      if (el === 'x' || el === 'R') {
-        channel.instrument.start(time);
-        counter++;
-      }
-    };
-  } else if (
-    channel.instrument instanceof Tone.PolySynth ||
-    channel.instrument instanceof Tone.Sampler
-  ) {
-    return (time: string, el: string) => {
-      if (el === 'x' || el === 'R') {
-        channel.instrument.triggerAttackRelease(
-          getNote(el, params, counter),
-          getDuration(params, counter),
-          time
-        );
-        counter++;
-      }
-    };
-  } else if (channel.instrument instanceof Tone.NoiseSynth) {
-    return (time: string, el: string) => {
-      if (el === 'x' || el === 'R') {
-        channel.instrument.triggerAttackRelease(
-          getDuration(params, counter),
-          time
-        );
-        counter++;
-      }
-    };
-  } else {
-    return (time: string, el: string) => {
-      if (el === 'x' || el === 'R') {
-        channel.instrument.triggerAttackRelease(
-          getNote(el, params, counter)[0],
-          getDuration(params, counter),
-          time
-        );
-        counter++;
-      }
-    };
-  }
 };
 
 export const recursivelyApplyPatternToDurations = (
@@ -188,7 +123,7 @@ const generateSequence = (
   }
 
   return new Tone.Sequence({
-    callback: getSeqFn(params, channel),
+    callback: channel.getSeqFn(params),
     events: expandStr(params.pattern),
     subdivision: params.subdiv || defaultSubdiv,
     context,

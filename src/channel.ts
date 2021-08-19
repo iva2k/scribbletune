@@ -1,4 +1,4 @@
-import { clip } from './browser-clip';
+import { clip, getNote, getDuration } from './browser-clip';
 
 /**
  * Get the next logical position to play in the session
@@ -70,7 +70,7 @@ export class Channel {
 
   static startTransport(): void {
     Tone.start();
-    Tone.Transport.start(); // TODO: Maybe set lookAhead - use Tone.Transport.start("+0.1");
+    Tone.Transport.start();
   }
 
   static stopTransport(): void {
@@ -129,6 +129,68 @@ export class Channel {
     } else {
       // Allow creation of empty clips
       this.channelClips[idx as number] = null;
+    }
+  }
+
+  /**
+   * @param  {Object} ClipParams clip parameters
+   * @return {Function} function that can be used as the callback in Tone.Sequence https://tonejs.github.io/docs/Sequence
+   */
+  getSeqFn(params: ClipParams): SeqFn {
+    let counter = 0;
+    if (this.external) {
+      return (time: string, el: string) => {
+        if (el === 'x' || el === 'R') {
+          this.external?.triggerAttackRelease(
+            getNote(el, params, counter)[0],
+            getDuration(params, counter),
+            time
+          );
+          counter++;
+        }
+      };
+    } else if (this.instrument instanceof Tone.Player) {
+      return (time: string, el: string) => {
+        if (el === 'x' || el === 'R') {
+          this.instrument.start(time);
+          counter++;
+        }
+      };
+    } else if (
+      this.instrument instanceof Tone.PolySynth ||
+      this.instrument instanceof Tone.Sampler
+    ) {
+      return (time: string, el: string) => {
+        if (el === 'x' || el === 'R') {
+          this.instrument.triggerAttackRelease(
+            getNote(el, params, counter),
+            getDuration(params, counter),
+            time
+          );
+          counter++;
+        }
+      };
+    } else if (this.instrument instanceof Tone.NoiseSynth) {
+      return (time: string, el: string) => {
+        if (el === 'x' || el === 'R') {
+          this.instrument.triggerAttackRelease(
+            getDuration(params, counter),
+            time
+          );
+          counter++;
+        }
+      };
+    } else {
+      return (time: string, el: string) => {
+        if (el === 'x' || el === 'R') {
+          this.instrument.triggerAttackRelease(
+            getNote(el, params, counter)[0],
+            getDuration(params, counter),
+            time
+          );
+          counter++;
+        }
+      };
     }
   }
 
