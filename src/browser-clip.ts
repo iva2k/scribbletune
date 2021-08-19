@@ -71,13 +71,20 @@ const convertChordsToNotes = (el: any) => {
 
 const random = (num = 1) => Math.round(Math.random() * num);
 
-export const getNote = (el: string, params: ClipParams, counter: number) => {
+export const getNote = (
+  el: string,
+  params: ClipParams,
+  counter: number
+): string | (string | string[])[] => {
   return el === 'R' && params.randomNotes
     ? params.randomNotes[random(params.randomNotes.length - 1)]
     : params.notes[counter % params.notes.length];
 };
 
-export const getDuration = (params: ClipParams, counter: number) => {
+export const getDuration = (
+  params: ClipParams,
+  counter: number
+): string | number | undefined => {
   return params.durations
     ? params.durations[counter % params.durations.length]
     : params.dur || params.subdiv || defaultDur;
