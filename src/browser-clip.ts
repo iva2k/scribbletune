@@ -1,3 +1,4 @@
+import { Channel } from './channel';
 import { isNote, shuffle, expandStr } from './utils';
 import { chord } from 'harmonics';
 const defaultSubdiv = '4n';
@@ -85,17 +86,17 @@ const getDuration = (params: ClipParams, counter: number) => {
 
 /**
  * @param  {Object}
- * @param  {Object} AudioContext Context from Tone.js
+ * @param  {Object} Channel to send output to
  * @return {Function}
  * Take an object literal which has a Tone.js instrument and return a function that can be used
  * as the callback in Tone.Sequence https://tonejs.github.io/docs/Sequence
  */
-const getSeqFn = (params: ClipParams): SeqFn => {
+const getSeqFn = (params: ClipParams, channel: Channel): SeqFn => {
   let counter = 0;
-  if (params.external) {
+  if (channel.external) {
     return (time: string, el: string) => {
       if (el === 'x' || el === 'R') {
-        params.external?.triggerAttackRelease(
+        channel.external?.triggerAttackRelease(
           getNote(el, params, counter)[0],
           getDuration(params, counter),
           time
@@ -103,20 +104,20 @@ const getSeqFn = (params: ClipParams): SeqFn => {
         counter++;
       }
     };
-  } else if (params.instrument instanceof Tone.Player) {
+  } else if (channel.instrument instanceof Tone.Player) {
     return (time: string, el: string) => {
       if (el === 'x' || el === 'R') {
-        params.instrument.start(time);
+        channel.instrument.start(time);
         counter++;
       }
     };
   } else if (
-    params.instrument instanceof Tone.PolySynth ||
-    params.instrument instanceof Tone.Sampler
+    channel.instrument instanceof Tone.PolySynth ||
+    channel.instrument instanceof Tone.Sampler
   ) {
     return (time: string, el: string) => {
       if (el === 'x' || el === 'R') {
-        params.instrument.triggerAttackRelease(
+        channel.instrument.triggerAttackRelease(
           getNote(el, params, counter),
           getDuration(params, counter),
           time
@@ -124,10 +125,10 @@ const getSeqFn = (params: ClipParams): SeqFn => {
         counter++;
       }
     };
-  } else if (params.instrument instanceof Tone.NoiseSynth) {
+  } else if (channel.instrument instanceof Tone.NoiseSynth) {
     return (time: string, el: string) => {
       if (el === 'x' || el === 'R') {
-        params.instrument.triggerAttackRelease(
+        channel.instrument.triggerAttackRelease(
           getDuration(params, counter),
           time
         );
@@ -137,7 +138,7 @@ const getSeqFn = (params: ClipParams): SeqFn => {
   } else {
     return (time: string, el: string) => {
       if (el === 'x' || el === 'R') {
-        params.instrument.triggerAttackRelease(
+        channel.instrument.triggerAttackRelease(
           getNote(el, params, counter)[0],
           getDuration(params, counter),
           time
@@ -169,26 +170,15 @@ export const recursivelyApplyPatternToDurations = (
   return durations;
 };
 
-const generateSequence = (params: ClipParams, context?: any): any => {
+const generateSequence = (
+  params: ClipParams,
+  channel: Channel,
+  context?: any
+): any => {
   context = context || Tone.getContext();
 
   if (!params.pattern) {
     throw new Error('No pattern provided!');
-  }
-
-  if (
-    !params.player &&
-    !params.instrument &&
-    !params.sample &&
-    !params.buffer &&
-    !params.synth &&
-    !params.sampler &&
-    !params.samples &&
-    !params.external
-  ) {
-    throw new Error(
-      'One of required player|instrument|sample|sampler|samples|buffer|external is not provided!'
-    );
   }
 
   if (!params.durations && !params.dur) {
@@ -198,99 +188,8 @@ const generateSequence = (params: ClipParams, context?: any): any => {
     );
   }
 
-  /*
-	1. The params object can be used to pass a sample (sound source) OR a synth(Synth/FMSynth/AMSynth etc) or samples.
-	Scribbletune will then create a Tone.js Player or Tone.js Instrument or Tone.js Sampler respectively
-	2. It can also be used to pass a Tone.js Player object or instrument that was created elsewhere
-	(mostly by Scribbletune itself in the channel creation method)
-	Either ways, a pattern is required and it will be used to create a playable Tone.js Sequence
-	 */
-
-  let effects = [];
-
-  const createEffect = (eff: any) => {
-    let effect: any;
-    if (typeof eff === 'string') {
-      effect = new Tone[eff]({ context });
-    } else if (eff.context !== context) {
-      effect = recreateToneObjectInContext(eff, context);
-    } else {
-      effect = eff;
-    }
-    return effect.toDestination();
-  };
-
-  const startEffect = (eff: any) => {
-    return typeof eff.start === 'function' ? eff.start() : eff;
-  };
-
-  if (params.effects) {
-    if (!Array.isArray(params.effects)) {
-      params.effects = [params.effects];
-    }
-    effects = params.effects.map(createEffect).map(startEffect);
-  }
-
-  if (params.synth && !params.instrument) {
-    params.instrument = params.synth;
-    console.warn(
-      'The "synth" parameter will be deprecated in the future. Please use the "instrument" parameter instead.'
-    );
-  }
-
-  if (params.sample || params.buffer) {
-    params.instrument = new Tone.Player({
-      url: params.sample || params.buffer,
-      context,
-    });
-  } else if (params.sampler) {
-    params.instrument = params.sampler;
-  } else if (params.player) {
-    params.instrument = params.player;
-  } else if (params.samples) {
-    params.instrument = new Tone.Sampler({ url: params.samples, context });
-  } else if (typeof params.instrument === 'string') {
-    params.instrument = new Tone[params.instrument]({ context });
-  } else if (params.external) {
-    params.instrument = { context, volume: { value: 0 } };
-  }
-  // else { params.instrument = params.instrument; }
-
-  if (!params.external && params.instrument.context !== context) {
-    params.instrument = recreateToneObjectInContext(params.instrument, context);
-  }
-
-  if (params.volume) {
-    params.instrument.volume.value = params.volume;
-  }
-
-  if (params.external) {
-    if (effects.length !== 0) {
-      throw new Error('Effects cannot be used with external output');
-    }
-  } else {
-    params.instrument.chain(...effects).toDestination();
-  }
-
-  if (params.external) {
-    params.external
-      ?.init(context.rawContext)
-      .then(() => {
-        console.log(
-          'Loaded external output module for channel idx %s %s',
-          params?.idx,
-          params?.name
-        );
-      })
-      .catch((e: any) => {
-        throw new Error(
-          `${e.message} loading external output module of channel idx ${params?.idx}, ${params?.name}`
-        );
-      });
-  }
-
   return new Tone.Sequence({
-    callback: getSeqFn(params),
+    callback: getSeqFn(params, channel),
     events: expandStr(params.pattern),
     subdivision: params.subdiv || defaultSubdiv,
     context,
@@ -340,34 +239,6 @@ export const renderingDuration = (
 let ongoingRenderingCounter = 0;
 let originalContext: any;
 
-const recreateToneObjectInContext = (toneObject: any, context: any) => {
-  if (toneObject instanceof Tone.PolySynth) {
-    return new Tone.PolySynth(Tone[toneObject._dummyVoice.name], {
-      ...toneObject.get(),
-      context,
-    });
-  } else if (toneObject instanceof Tone.Player) {
-    return new Tone.Player({ url: toneObject._buffer, context });
-  } else if (toneObject instanceof Tone.Sampler) {
-    const { attack, curve, release, volume } = toneObject.get();
-    const paramsFromSampler = { attack, curve, release, volume };
-    const paramsFromBuffers = {
-      baseUrl: toneObject._buffers.baseUrl,
-      urls: Object.fromEntries(toneObject._buffers._buffers.entries()),
-    };
-    return new Tone.Sampler({
-      ...paramsFromSampler,
-      ...paramsFromBuffers,
-      context,
-    });
-  } else {
-    return new Tone[toneObject.name]({
-      ...toneObject.get(),
-      context,
-    });
-  }
-};
-
 const offlineRenderClip = (params: ClipParams, duration: number) => {
   if (!originalContext) {
     originalContext = Tone.getContext();
@@ -398,7 +269,7 @@ const offlineRenderClip = (params: ClipParams, duration: number) => {
  * Take a object literal that may have a Tone.js player OR instrument
  * or simply a sample or synth with a pattern and return a Tone.js sequence
  */
-export const clip = (params: ClipParams): any => {
+export const clip = (params: ClipParams, channel: Channel): any => {
   params = { ...getDefaultParams(), ...(params || {}) };
 
   // If notes is a string, split it into an array
@@ -441,5 +312,5 @@ export const clip = (params: ClipParams): any => {
       )
     );
   }
-  return generateSequence(params, originalContext);
+  return generateSequence(params, channel, originalContext);
 };
