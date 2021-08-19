@@ -70,11 +70,35 @@ export class Channel {
 
   static startTransport(): void {
     Tone.start();
-    Tone.Transport.start(); // TODO: Maybe use Tone.Transport.start("+0.1"); for setting lookAhead value.
+    Tone.Transport.start(); // TODO: Maybe set lookAhead - use Tone.Transport.start("+0.1");
   }
 
   static stopTransport(): void {
     Tone.Transport.stop();
+  }
+
+  setVolume(volume: number): void {
+    // ? this.volume = volume;
+
+    // Change volume of the player
+    if (this.player) {
+      this.player.volume.value = volume;
+    }
+
+    // Change volume of the sampler
+    if (this.sampler) {
+      this.sampler.volume.value = volume;
+    }
+
+    // Change volume of the instrument
+    if (this.instrument) {
+      this.instrument.volume.value = volume;
+    }
+
+    // Change volume of the external
+    if (this.external) {
+      this.external?.setVolume(volume);
+    }
   }
 
   startClip(idx: number): void {
