@@ -16,7 +16,6 @@ const getDefaultParams = (): ClipParams => ({
   amp: 100,
   accentLow: 70,
   randomNotes: null,
-  effects: [],
   offlineRendering: false,
 });
 
