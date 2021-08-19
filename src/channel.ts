@@ -37,17 +37,11 @@ export class Channel {
   sampler: any;
   external: any;
   initializerTask: Promise<void>;
+  private eventCbFn: EventFn | undefined;
 
   constructor(params: ChannelParams) {
     (this.idx = params.idx || 0), (this.activePatternIdx = -1);
     this.channelClips = [];
-
-    this.initializerTask = this.initOutputProducer(undefined, params).catch(
-      e => {
-        console.error(`${e.message} in channel ${this.idx} "${params?.name}"`);
-        // TODO: Implement a mechanism to handle async errors.
-      }
-    );
 
     // Filter out unrequired params and create clip params object
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -55,7 +49,18 @@ export class Channel {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { external, sampler, buffer, ...params2 } = params1;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { player, instrument, volume, ...originalParamsFiltered } = params2;
+    const { player, instrument, volume, ...params3 } = params2;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { eventCb, ...originalParamsFiltered } = params3;
+
+    this.eventCbFn = eventCb;
+
+    this.initializerTask = this.initOutputProducer(undefined, params).catch(
+      e => {
+        console.error(`${e.message} in channel ${this.idx} "${params?.name}"`);
+        this.eventCb('error', { e, channel: this }); // Report async errors.
+      }
+    );
 
     params.clips.forEach((c: any, i: number) => {
       try {
@@ -191,6 +196,12 @@ export class Channel {
           counter++;
         }
       };
+    }
+  }
+
+  private eventCb(event: string, params: any): void {
+    if (typeof this.eventCbFn === 'function') {
+      this.eventCbFn(event, params);
     }
   }
 

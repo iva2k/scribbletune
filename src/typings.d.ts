@@ -191,6 +191,8 @@ interface ChannelParams {
    *  - See:      https://tonejs.github.io/docs/13.8.25/Volume
    */
   volume?: number;
+
+  eventCb?: EventFn;
 }
 
 type ChannelPattern = {
@@ -232,6 +234,8 @@ interface PlayParams {
 }
 
 type SeqFn = (time: string, el: string) => void;
+
+type EventFn = (event: string, params: any) => void;
 
 declare let Tone: any;
 declare let LiveAPI: any;
