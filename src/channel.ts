@@ -36,7 +36,7 @@ export class Channel {
   instrument: any;
   sampler: any;
   external: any;
-  initializerTask: Promise<void>; // TODO: Implement a mechanism to handle async errors.
+  initializerTask: Promise<void>;
 
   constructor(params: ChannelParams) {
     (this.idx = params.idx || 0), (this.activePatternIdx = -1);
@@ -44,9 +44,8 @@ export class Channel {
 
     this.initializerTask = this.initOutputProducer(undefined, params).catch(
       e => {
-        throw new Error(
-          `${e.message} in channel ${this.idx} "${params?.name}"`
-        );
+        console.error(`${e.message} in channel ${this.idx} "${params?.name}"`);
+        // TODO: Implement a mechanism to handle async errors.
       }
     );
 
