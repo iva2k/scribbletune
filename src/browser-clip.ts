@@ -22,12 +22,12 @@ const getDefaultParams = (): ClipParams => ({
   offlineRendering: false,
 });
 
-/**
+/* UNUSED *
  * HDR speed is denoted by the number of ticks per note
  * By default this is set to a quarter note (4n) to be in line with Tone.js' default subdivision
  * Technically a bar is 512 ticks long. So it's HDR speed is 512
  * @type {Object}
- */
+ * /
 const hdr: NVP<number> = {
   '1m': 2048,
   '2m': 4096,
@@ -39,6 +39,7 @@ const hdr: NVP<number> = {
   '8n': 64,
   '16n': 32,
 };
+/* */
 
 const convertChordsToNotes = (el: any) => {
   if (isNote(el as string)) {
@@ -151,7 +152,7 @@ export const recursivelyApplyPatternToDurations = (
   patternArr: string[],
   length: number,
   durations: number[] = []
-) => {
+): number[] => {
   patternArr.forEach(char => {
     if (typeof char === 'string') {
       if (char === 'x' || char === 'R') {
@@ -168,7 +169,7 @@ export const recursivelyApplyPatternToDurations = (
   return durations;
 };
 
-const generateSequence = (params: ClipParams, context?: any) => {
+const generateSequence = (params: ClipParams, context?: any): any => {
   context = context || Tone.getContext();
 
   if (!params.pattern) {
@@ -299,7 +300,7 @@ const generateSequence = (params: ClipParams, context?: any) => {
 export const totalPatternDuration = (
   pattern: string,
   subdivOrLength: string | number
-) => {
+): number => {
   return typeof subdivOrLength === 'number'
     ? subdivOrLength * expandStr(pattern).length
     : Tone.Ticks(subdivOrLength).toSeconds() * expandStr(pattern).length;
@@ -319,7 +320,7 @@ export const renderingDuration = (
   subdivOrLength: string | number,
   notes: string | (string | string[])[],
   randomNotes: undefined | null | string | (string | string[])[]
-) => {
+): number => {
   const patternRegularNotesCount = pattern.split('').filter(c => {
     return c === 'x';
   }).length;
@@ -397,7 +398,7 @@ const offlineRenderClip = (params: ClipParams, duration: number) => {
  * Take a object literal that may have a Tone.js player OR instrument
  * or simply a sample or synth with a pattern and return a Tone.js sequence
  */
-export const clip = (params: ClipParams) => {
+export const clip = (params: ClipParams): any => {
   params = { ...getDefaultParams(), ...(params || {}) };
 
   // If notes is a string, split it into an array
@@ -409,7 +410,7 @@ export const clip = (params: ClipParams) => {
 
   params.notes = params.notes.map(convertChordsToNotes);
 
-  if (/[^x\-_\[\]R]/.test(params.pattern)) {
+  if (/[^x\-_[\]R]/.test(params.pattern)) {
     throw new TypeError(
       `pattern can only comprise x - _ [ ] R, found ${params.pattern}`
     );

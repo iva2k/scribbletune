@@ -45,8 +45,8 @@ type Params = {
  * You can even provide Params as an object.
  * For e.g. arp({count: 8, order: '10325476', chords: 'FM_4 Gm7b5_4 AbM_4 Bbm_4 Cm_5 DbM_5 EbM_5})
  */
-export const arp = (chordsOrParams: string | Params) => {
-  let finalArr: any = [];
+export const arp = (chordsOrParams: string | Params): any[] => {
+  let finalArr: any[] = [];
   const params: Params = {
     count: 4,
     order: '0123',

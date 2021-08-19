@@ -59,6 +59,7 @@ export class Channel {
     }
 
     // Filter out unrequired params and create clip params object
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { clips, samples, sample, synth, ...originalParamsFiltered } = params;
 
     params.clips.forEach((c: any, i: number) => {
@@ -72,7 +73,7 @@ export class Channel {
     }, this);
   }
 
-  get clips() {
+  get clips(): any[] {
     return this.channelClips;
   }
 
@@ -85,7 +86,7 @@ export class Channel {
     Tone.Transport.stop();
   }
 
-  startClip(idx: number) {
+  startClip(idx: number): void {
     // Stop any other currently running clip
     if (this.activePatternIdx > -1 && this.activePatternIdx !== idx) {
       this.stopClip(this.activePatternIdx);
@@ -97,11 +98,11 @@ export class Channel {
     }
   }
 
-  stopClip(idx: number) {
+  stopClip(idx: number): void {
     this.channelClips[idx].stop(getNextPos());
   }
 
-  addClip(clipParams: any, idx?: number) {
+  addClip(clipParams: ClipParams, idx?: number): void {
     idx = idx || this.channelClips.length;
     if (clipParams.pattern) {
       this.channelClips[idx as number] = clip({
@@ -116,7 +117,7 @@ export class Channel {
     }
   }
 
-  get activeClipIdx() {
+  get activeClipIdx(): number {
     return this.activePatternIdx;
   }
 }

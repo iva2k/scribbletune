@@ -67,7 +67,7 @@ const convertChordsToNotes = (el: any) => {
   throw new Error(`Chord ${el} not found`);
 };
 
-export const clip = (params: ClipParams) => {
+export const clip = (params: ClipParams): any => {
   params = { ...getDefaultParams(), ...(params || {}) };
 
   // If notes is a string, split it into an array
@@ -79,7 +79,7 @@ export const clip = (params: ClipParams) => {
 
   params.notes = params.notes.map(convertChordsToNotes);
 
-  if (/[^x\-_\[\]R]/.test(params.pattern)) {
+  if (/[^x\-_[\]R]/.test(params.pattern)) {
     throw new TypeError(
       `pattern can only comprise x - _ [ ] R, found ${params.pattern}`
     );
@@ -243,7 +243,8 @@ export const clip = (params: ClipParams) => {
   }
 
   if (params.accent) {
-    if (/[^x\-]/.test(params.accent)) {
+    // TODO: Eslint barks at \- as useless, need to verify that JS handles - without \ properly.
+    if (/[^x-]/.test(params.accent)) {
       throw new TypeError('Accent can only have x and - characters');
     }
 

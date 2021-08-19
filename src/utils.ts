@@ -26,7 +26,7 @@ export const expandStr = (str: string): any => {
  * @param  {boolean} fullShuffle Ensure no elements remain in old place
  * @return {Array}
  */
-export const shuffle = (arr: any[], fullShuffle: boolean = true): string[] => {
+export const shuffle = (arr: any[], fullShuffle = true): string[] => {
   const lastIndex: number = arr.length - 1;
 
   // Shuffle algorithm by Richard Durstenfeld (Donald E. Knuth), also Ronald Fisher and Frank Yates.
@@ -40,8 +40,7 @@ export const shuffle = (arr: any[], fullShuffle: boolean = true): string[] => {
       return;
     }
     // Swap el with one of the higher elements randomly
-    let rnd;
-    rnd = fullShuffle
+    const rnd = fullShuffle
       ? // Pick random number from idx+1 to lastIndex (Modified algorithm, (N-1)! combinations)
         // Math.random -> [0, 1) -> [0, lastIndex-idx ) --floor-> [0, lastIndex-idx-1]
         // rnd = [0, lastIndex-idx-1] + 1 + idx = [1 + idx, lastIndex]
@@ -62,7 +61,7 @@ export const shuffle = (arr: any[], fullShuffle: boolean = true): string[] => {
  * @param {Number} maxLevel A number between not more than 127
  * @return {Array}  Example output [63, 90, 110, 127, 110, 90, 63, 0, 63, 90, 110, 127, 110, 90, 63, 0]
  */
-export const sizzleMap = (maxLevel: number = 127): number[] => {
+export const sizzleMap = (maxLevel = 127): number[] => {
   const pi = Math.PI;
   const piArr: number[] = [
     pi / 6,
@@ -93,16 +92,16 @@ export const sizzleMap = (maxLevel: number = 127): number[] => {
  * Pick one item randomly from an array and return it
  * @param arr
  */
-export const pickOne = (arr: any[]) =>
+export const pickOne = (arr: any[]): any =>
   arr.length > 1 ? arr[Math.round(Math.random())] : arr[0];
 
 /**
  * Boolean generator
  */
-export const dice = () => !!Math.round(Math.random());
+export const dice = (): boolean => !!Math.round(Math.random());
 
 /**
  * Polyfill for Array.prototype.flat
  */
-export const flat = (arr: any[][]) =>
+export const flat = (arr: any[][]): any[] =>
   arr.reduce((acc, val) => acc.concat(val), []);
