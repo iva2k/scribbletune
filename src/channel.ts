@@ -57,7 +57,9 @@ export class Channel {
 
     this.initializerTask = this.initOutputProducer(undefined, params).catch(
       e => {
-        console.error(`${e.message} in channel ${this.idx} "${params?.name}"`);
+        console.error(
+          `${e.message} in channel ${this.idx} "${params.name ?? '(no name)'}"`
+        );
         this.eventCb('error', { e, channel: this }); // Report async errors.
       }
     );
@@ -102,7 +104,7 @@ export class Channel {
 
     // Change volume of the external
     if (this.external) {
-      this.external?.setVolume(volume);
+      this.external.setVolume?.(volume);
     }
   }
 
@@ -147,7 +149,7 @@ export class Channel {
       return (time: string, el: string) => {
         if (el === 'x' || el === 'R') {
           const duration = Tone.Time(getDuration(params, counter)).toSeconds();
-          this.external?.triggerAttackRelease(
+          this.external.triggerAttackRelease?.(
             getNote(el, params, counter)[0],
             duration,
             time
@@ -309,7 +311,10 @@ export class Channel {
         }
       } catch (e) {
         reject(
-          new Error(`${e.message} in channel ${this.idx} "${params?.name}"`)
+          new Error(
+            `${e.message} in channel ${this.idx} "${params.name ??
+              '(no name)'}"`
+          )
         );
       }
 
@@ -363,16 +368,18 @@ export class Channel {
           .init(context.rawContext)
           .then(() => {
             console.log(
-              'Loaded external output module for channel idx %s %s',
-              params?.idx,
-              params?.name
+              `Loaded external output module for channel idx ${
+                this.idx
+              } "${params.name ?? '(no name)'}"`
             );
             resolve();
           })
           .catch((e: any) => {
             reject(
               new Error(
-                `${e.message} loading external output module of channel idx ${params?.idx}, ${params?.name}`
+                `${e.message} loading external output module of channel idx ${
+                  this.idx
+                }, ${params.name ?? '(no name)'}`
               )
             );
           });
