@@ -108,20 +108,25 @@ export class Channel {
     }
   }
 
-  startClip(idx: number): void {
+  startClip(idx: number, position?: number | string): void {
+    position = position || (position === 0 ? 0 : getNextPos());
     // Stop any other currently running clip
     if (this.activePatternIdx > -1 && this.activePatternIdx !== idx) {
-      this.stopClip(this.activePatternIdx);
+      this.stopClip(this.activePatternIdx, position);
     }
 
     if (this.channelClips[idx] && this.channelClips[idx].state !== 'started') {
       this.activePatternIdx = idx;
-      this.channelClips[idx].start(getNextPos());
+      this.channelClips[idx].start(position);
     }
   }
 
-  stopClip(idx: number): void {
-    this.channelClips[idx].stop(getNextPos());
+  stopClip(idx: number, position?: number | string): void {
+    position = position || (position === 0 ? 0 : getNextPos());
+    this.channelClips[idx].stop(position);
+    if (idx === this.activePatternIdx) {
+      this.activePatternIdx = -1;
+    }
   }
 
   addClip(clipParams: ClipParams, idx?: number): void {
