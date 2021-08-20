@@ -146,9 +146,10 @@ export class Channel {
     if (this.external) {
       return (time: string, el: string) => {
         if (el === 'x' || el === 'R') {
+          const duration = Tone.Time(getDuration(params, counter)).toSeconds();
           this.external?.triggerAttackRelease(
             getNote(el, params, counter)[0],
-            getDuration(params, counter),
+            duration,
             time
           );
           counter++;
