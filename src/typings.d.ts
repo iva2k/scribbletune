@@ -82,11 +82,6 @@ interface ClipParams {
    *  - Example:  `'C4 D4 C4 D#4 C4 D4 C4 Bb3'`
    */
   randomNotes?: null | string | (string | string[])[];
-  /**
-   * The name of a synthesizer, listed in `Tone.js`.
-   *  - Example: `'PolySynth'`.
-   *  - See:  [GitHub ~ Tone.js/Tone/instrument](https://github.com/Tonejs/Tone.js/tree/dev/Tone/instrument)
-   */
 
   /**
    * The duration of an individual sample that is used in a browser `clip`.
