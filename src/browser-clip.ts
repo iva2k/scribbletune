@@ -69,16 +69,20 @@ const convertChordsToNotes = (el: any) => {
   throw new Error(`Chord ${el} not found`);
 };
 
-const random = (num = 1) => Math.round(Math.random() * num);
+const randomInt = (num = 1) => Math.round(Math.random() * num);
 
 export const getNote = (
   el: string,
   params: ClipParams,
   counter: number
 ): string | (string | string[])[] => {
-  return el === 'R' && params.randomNotes
-    ? params.randomNotes[random(params.randomNotes.length - 1)]
-    : params.notes[counter % params.notes.length];
+  if (el === 'R' && params.randomNotes && params.randomNotes.length > 0) {
+    return params.randomNotes[randomInt(params.randomNotes.length - 1)];
+  }
+  if (params.notes) {
+    return params.notes[counter % (params.notes.length || 1)];
+  }
+  return '';
 };
 
 export const getDuration = (
@@ -220,7 +224,7 @@ export const clip = (params: ClipParams, channel: Channel): any => {
     params.notes = params.notes.split(' ');
   }
 
-  params.notes = params.notes.map(convertChordsToNotes);
+  params.notes = params.notes ? params.notes.map(convertChordsToNotes) : [];
 
   if (/[^x\-_[\]R]/.test(params.pattern)) {
     throw new TypeError(

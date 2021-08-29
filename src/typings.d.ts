@@ -23,7 +23,7 @@ interface ClipParams {
    *  - Default:  `[ 'C4' ]`
    *  - Example:  `'C4 D4 C4 D#4 C4 D4 C4 Bb3'`
    */
-  notes: string | (string | string[])[];
+  notes?: string | (string | string[])[];
   /**
    * A musical rhythm, expressed using Scribbletune's pattern language,
    * which can be adapted to output MIDI files or `Tone.js` sequences.

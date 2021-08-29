@@ -66,6 +66,8 @@ const convertChordsToNotes = (el: any) => {
   throw new Error(`Chord ${el} not found`);
 };
 
+const randomInt = (num = 1) => Math.round(Math.random() * num);
+
 export const clip = (params: ClipParams): any => {
   params = { ...getDefaultParams(), ...(params || {}) };
 
@@ -76,7 +78,7 @@ export const clip = (params: ClipParams): any => {
     params.notes = params.notes.split(' ');
   }
 
-  params.notes = params.notes.map(convertChordsToNotes);
+  params.notes = params.notes ? params.notes.map(convertChordsToNotes) : [];
 
   if (/[^x\-_[\]R]/.test(params.pattern)) {
     throw new TypeError(
@@ -116,14 +118,19 @@ export const clip = (params: ClipParams): any => {
     let totalLength = 0;
     patternArr.forEach((char, idx) => {
       if (typeof char === 'string') {
-        let note: any = char === '-' ? null : params.notes[step];
+        let note: any = null;
 
-        if (char === 'R' && (Math.round(Math.random()) || params.randomNotes)) {
-          note = params.randomNotes
-            ? params.randomNotes[
-                Math.round(Math.random() * (params.randomNotes.length - 1))
-              ]
-            : params.notes[step];
+        if (char === '-') {
+          // note = null;
+        } else if (
+          char === 'R' &&
+          randomInt() && // Use 1/2 probability for R to pick from param.notes
+          params.randomNotes &&
+          params.randomNotes.length > 0
+        ) {
+          note = params.randomNotes[randomInt(params.randomNotes.length - 1)];
+        } else if (params.notes) {
+          note = params.notes[step];
         }
 
         if (char === 'x' || char === 'R') {
@@ -167,7 +174,7 @@ export const clip = (params: ClipParams): any => {
         }
 
         // If the pattern is longer than the notes, then repeat notes
-        if (step === params.notes.length) {
+        if (step === params.notes?.length) {
           step = 0;
         }
       }
