@@ -50,8 +50,8 @@ export class Session {
     Channel.startTransport();
   }
 
-  stopTransport(): void {
-    Channel.stopTransport();
+  stopTransport(deleteEvents = true): void {
+    Channel.stopTransport(deleteEvents);
   }
 
   // Start the clips at a specific index in all the channels

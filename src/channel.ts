@@ -80,8 +80,9 @@ export class Channel {
     Tone.Transport.start();
   }
 
-  static stopTransport(): void {
+  static stopTransport(deleteEvents = true): void {
     Tone.Transport.stop();
+    deleteEvents && Tone.Transport.cancel(); // Delete all events in the Tone.Transport
   }
 
   setVolume(volume: number): void {
