@@ -7,7 +7,15 @@
 			"group": "build",
 			"problemMatcher": [],
 			"label": "npm:build",
-			"detail": "webpack"
+			"detail": "build all targets"
+		},
+		{
+			"type": "npm",
+			"script": "watch:browser",
+			"group": "build",
+			"problemMatcher": [],
+			"label": "npm: watch:browser",
+			"detail": "continuous development for browser"
 		},
 		{
 			"type": "npm",
@@ -32,7 +40,7 @@
 				]
 			},
 			"label": "npm: lint",
-			"detail": "eslint -c .eslintrc --ext .ts src"
+			"detail": "lint check"
 		},
 		{
 			"type": "npm",
@@ -41,7 +49,7 @@
 				"$eslint-stylish"
 			],
 			"label": "npm: lint:fix",
-			"detail": "eslint -c .eslintrc --ext .ts src --fix"
+			"detail": "lint fix"
 		}
 	]
 }

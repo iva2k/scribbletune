@@ -1,7 +1,17 @@
 {
-    "recommendations": [
-        "orta.vscode-jest",
-        "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode"
-    ]
+  "recommendations": [
+    "christian-kohler.npm-intellisense",
+    "christian-kohler.path-intellisense",
+    "coenraads.bracket-pair-colorizer-2",
+    "dbaeumer.vscode-eslint",
+    "donjayamanne.githistory",
+    "eamodio.gitlens",
+    "editorconfig.editorconfig",
+    "eg2.vscode-npm-script",
+    "esbenp.prettier-vscode",
+    "gruntfuggly.todo-tree",
+    "orta.vscode-jest",
+    "pflannery.vscode-versionlens",
+    "wix.vscode-import-cost"
+  ]
 }
