@@ -305,7 +305,7 @@ export class Channel {
         } else if (typeof params.instrument === 'string') {
           this.instrument = new Tone[params.instrument]({ context });
         } else if (params.instrument) {
-          this.instrument = params.instrument; // TODO: This is dangerous by-reference assignment. Tone.instrument has context that holds all other instruments. Client side params get polluted with circular referencces. If it comes from e.g. react-ApolloClient, Apollo tools crash on circular references.
+          this.instrument = params.instrument; // TODO: This is dangerous by-reference assignment. Tone.instrument has context that holds all other instruments. Client side params get polluted with circular references. If params come from e.g. react-ApolloClient data, Apollo tools crash on circular references.
         } else if (params.sample || params.buffer) {
           this.instrument = new Tone.Player({
             url: params.sample || params.buffer,
