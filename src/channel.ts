@@ -378,7 +378,7 @@ export class Channel {
           });
           this.checkToneObjLoaded(this.instrument, resolve);
         } else {
-          this.instrument = params.synth;
+          this.instrument = params.synth; // TODO: This is dangerous by-reference assignment.
           console.warn(
             'The "synth" parameter with instrument will be deprecated in the future. Please use the "instrument" parameter instead.'
           );
@@ -404,13 +404,13 @@ export class Channel {
           onload: () => this.checkToneObjLoaded(this.instrument, resolve),
         });
       } else if (params.sampler) {
-        this.instrument = params.sampler;
+        this.instrument = params.sampler; // TODO: This is dangerous by-reference assignment.
         this.checkToneObjLoaded(this.instrument, resolve);
       } else if (params.player) {
-        this.instrument = params.player;
+        this.instrument = params.player; // TODO: This is dangerous by-reference assignment.
         this.checkToneObjLoaded(this.instrument, resolve);
       } else if (params.external) {
-        this.external = { ...params.external };
+        this.external = { ...params.external }; // Sanitize object by shallow clone
         this.instrument = {
           context,
           volume: { value: 0 },
