@@ -30,6 +30,7 @@ const getNextPos = (): number | string => {
  */
 export class Channel {
   idx: number | string;
+  name: string;
   activePatternIdx: number;
   channelClips: any;
   player: any;
@@ -42,7 +43,9 @@ export class Channel {
   private eventCbFn: EventFn | undefined;
 
   constructor(params: ChannelParams) {
-    (this.idx = params.idx || 0), (this.activePatternIdx = -1);
+    this.idx = params.idx || 0;
+    this.name = params.name || 'ch ' + params.idx;
+    this.activePatternIdx = -1;
     this.channelClips = [];
 
     // Filter out unrequired params and create clip params object
