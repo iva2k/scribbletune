@@ -63,20 +63,22 @@ export class Channel {
 
     this.hasLoaded = false;
     this.hasFailed = false;
-    this.initializerTask = this.initOutputProducer(context, params).then(() => {
-      return this.initInstrument(context, params).then(() => {
-        return this.initEffects(context, params).then(() => {
-          this.hasLoaded = true;
-          this.eventCb('loaded', { channel: this }); // Report async load completion.
+    this.initializerTask = this.initOutputProducer(context, params)
+      .then(() => {
+        return this.initInstrument(context, params).then(() => {
+          return this.initEffects(context, params).then(() => {
+            this.hasLoaded = true;
+            this.eventCb('loaded', { channel: this }); // Report async load completion.
+          });
         });
+      })
+      .catch(e => {
+        this.hasFailed = e;
+        console.error(
+          `${e.message} in channel ${this.idx} "${params.name ?? '(no name)'}"`
+        );
+        this.eventCb('error', { e, channel: this }); // Report async errors.
       });
-    }).catch(e => {
-      this.hasFailed = e;
-      console.error(
-        `${e.message} in channel ${this.idx} "${params.name ?? '(no name)'}"`
-      );
-      this.eventCb('error', { e, channel: this }); // Report async errors.
-    });
 
     params.clips.forEach((c: any, i: number) => {
       try {
@@ -397,7 +399,7 @@ export class Channel {
         this.instrument.volume.value = params.volume;
       }
       resolve();
-    };
+    });
   }
 
   private async initEffects(
