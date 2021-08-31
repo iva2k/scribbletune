@@ -37,6 +37,8 @@ export class Channel {
   sampler: any;
   external: any;
   initializerTask: Promise<void>;
+  hasLoaded: boolean; // if (!this.hasLoaded) - don't play this channel. Either still loading, or (initOutputProducer() rejected,
+  hasFailed: boolean | Error;
   private eventCbFn: EventFn | undefined;
 
   constructor(params: ChannelParams) {
@@ -55,14 +57,20 @@ export class Channel {
 
     this.eventCbFn = eventCb;
 
-    this.initializerTask = this.initOutputProducer(undefined, params).catch(
-      e => {
+    this.hasLoaded = false;
+    this.hasFailed = false;
+    this.initializerTask = this.initOutputProducer(undefined, params)
+      .then(() => {
+        this.hasLoaded = true;
+        this.eventCb('loaded', { channel: this }); // Report async load completion.
+      })
+      .catch(e => {
+        this.hasFailed = e;
         console.error(
           `${e.message} in channel ${this.idx} "${params.name ?? '(no name)'}"`
         );
         this.eventCb('error', { e, channel: this }); // Report async errors.
-      }
-    );
+      });
 
     params.clips.forEach((c: any, i: number) => {
       try {
@@ -82,7 +90,10 @@ export class Channel {
 
   static stopTransport(deleteEvents = true): void {
     Tone.Transport.stop();
-    deleteEvents && Tone.Transport.cancel(); // Delete all events in the Tone.Transport
+    if (deleteEvents) {
+      // Delete all events in the Tone.Transport
+      Tone.Transport.cancel();
+    }
   }
 
   setVolume(volume: number): void {
@@ -153,7 +164,7 @@ export class Channel {
     let counter = 0;
     if (this.external) {
       return (time: string, el: string) => {
-        if (el === 'x' || el === 'R') {
+        if (this.hasLoaded && (el === 'x' || el === 'R')) {
           const duration = Tone.Time(getDuration(params, counter)).toSeconds();
           this.external.triggerAttackRelease?.(
             getNote(el, params, counter)[0],
@@ -165,7 +176,7 @@ export class Channel {
       };
     } else if (this.instrument instanceof Tone.Player) {
       return (time: string, el: string) => {
-        if (el === 'x' || el === 'R') {
+        if (this.hasLoaded && (el === 'x' || el === 'R')) {
           this.instrument.start(time);
           counter++;
         }
@@ -175,7 +186,7 @@ export class Channel {
       this.instrument instanceof Tone.Sampler
     ) {
       return (time: string, el: string) => {
-        if (el === 'x' || el === 'R') {
+        if (this.hasLoaded && (el === 'x' || el === 'R')) {
           this.instrument.triggerAttackRelease(
             getNote(el, params, counter),
             getDuration(params, counter),
@@ -186,7 +197,7 @@ export class Channel {
       };
     } else if (this.instrument instanceof Tone.NoiseSynth) {
       return (time: string, el: string) => {
-        if (el === 'x' || el === 'R') {
+        if (this.hasLoaded && (el === 'x' || el === 'R')) {
           this.instrument.triggerAttackRelease(
             getDuration(params, counter),
             time
@@ -196,7 +207,7 @@ export class Channel {
       };
     } else {
       return (time: string, el: string) => {
-        if (el === 'x' || el === 'R') {
+        if (this.hasLoaded && (el === 'x' || el === 'R')) {
           this.instrument.triggerAttackRelease(
             getNote(el, params, counter)[0],
             getDuration(params, counter),
@@ -274,18 +285,24 @@ export class Channel {
               'Either synth or instrument can be provided, but not both.'
             );
           }
-          params.instrument = params.synth;
-          console.warn(
-            'The "synth" parameter will be deprecated in the future. Please use the "instrument" parameter instead.'
-          );
-
-          // this.instrument = new Tone[params.synth]();
+          if (!(params.synth as SynthParams).synth) {
+            params.instrument = params.synth;
+            console.warn(
+              'The "synth" parameter with instrument will be deprecated in the future. Please use the "instrument" parameter instead.'
+            );
+            // params.synth describing the Tone[params.synth.synth] is allowed.
+          }
         }
 
-        if (typeof params.instrument === 'string') {
+        if (params.synth && (params.synth as SynthParams).synth) {
+          const synthName = (params.synth as SynthParams).synth;
+          //  const presetName = (params.synth as SynthParams).presetName; // Unused here
+          const preset = (params.synth as SynthParams).preset || {};
+          this.instrument = new Tone[synthName]({ ...preset, context });
+        } else if (typeof params.instrument === 'string') {
           this.instrument = new Tone[params.instrument]({ context });
         } else if (params.instrument) {
-          this.instrument = params.instrument;
+          this.instrument = params.instrument; // TODO: This is dangerous by-reference assignment. Tone.instrument has context that holds all other instruments. Client side params get polluted with circular referencces. If it comes from e.g. react-ApolloClient, Apollo tools crash on circular references.
         } else if (params.sample || params.buffer) {
           this.instrument = new Tone.Player({
             url: params.sample || params.buffer,
@@ -301,7 +318,7 @@ export class Channel {
         } else if (params.player) {
           this.instrument = params.player;
         } else if (params.external) {
-          this.external = params.external;
+          this.external = { ...params.external };
           this.instrument = {
             context,
             volume: { value: 0 },
@@ -316,12 +333,12 @@ export class Channel {
           throw new Error('Failed instantiating instrument from given params.');
         }
       } catch (e) {
-        reject(
-          new Error(
-            `${e.message} in channel ${this.idx} "${params.name ??
-              '(no name)'}"`
-          )
+        const err = new Error(
+          `${e.message} in channel ${this.idx} "${params.name ?? '(no name)'}"`
         );
+        reject(err);
+        throw err; // I admit - I have no idea why reject(err) keeps going and upper .catch() does not strike.
+        // Perhaps it is because code under try {} block is not async, but that is not a good explanation.
       }
 
       const createEffect = (eff: any) => {

@@ -109,6 +109,26 @@ interface ClipParams {
   offlineRenderingCallback?: any;
 }
 
+/**
+ * Definition of a synthesizer from `Tone.js`.
+ */
+interface SynthParams {
+  /**
+   *  The name of the synthesizer, listed in `Tone.js`.
+   *  - Example: `'PolySynth'`.
+   *  - See:  [GitHub ~ Tone.js/Tone/instrument](https://github.com/Tonejs/Tone.js/tree/dev/Tone/instrument)
+   */
+  synth: string;
+  /**
+   *  Descriptive name of the preset.
+   */
+  presetName?: string;
+  /**
+   *  Object with parameters for passing to `new Tone[synth](preset)`.
+   */
+  preset: any;
+}
+
 interface ChannelParams {
   idx?: number | string;
   name?: string;
@@ -123,11 +143,13 @@ interface ChannelParams {
   amp?: number;
 
   /**
-   * The name of a synthesizer, listed in `Tone.js`.
+   * This use is depreceated: The name of a synthesizer, listed in `Tone.js`.
    *  - Example: `'PolySynth'`.
    *  - See:  [GitHub ~ Tone.js/Tone/instrument](https://github.com/Tonejs/Tone.js/tree/dev/Tone/instrument)
+   *
+   * New use going forward: SynthParams
    */
-  synth?: any;
+  synth?: string | SynthParams;
   /**
    * A `Tone.Instrument` instance or the name of a synthesizer, listed in `Tone.js`. Only in the browser.
    *  - Example: `'Synth'`
