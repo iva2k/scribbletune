@@ -43,7 +43,7 @@ export class Channel {
   private eventCbFn: EventFn | undefined;
 
   constructor(params: ChannelParams) {
-    let context = params.context || Tone.getContext();
+    const context = params.context || Tone.getContext();
     this.idx = params.idx || 0;
     this.name = params.name || 'ch ' + params.idx;
     this.activePatternIdx = -1;
@@ -249,6 +249,7 @@ export class Channel {
       return new Tone.Player({
         url: toneObject._buffer,
         context,
+        // TODO: onload
       });
     } else if (toneObject instanceof Tone.Sampler) {
       const { attack, curve, release, volume } = toneObject.get();
@@ -266,12 +267,73 @@ export class Channel {
         ...paramsFromSampler,
         ...paramsFromBuffers,
         context,
+        // TODO: onload
       });
     } else {
       return new Tone[toneObject.name]({
         ...toneObject.get(),
         context,
       });
+    }
+  }
+
+  /**
+   * Check Tone.js object loaded state and either invoke `resolve` right away, or attach to and wait using Tone onload cb.
+   * It's an ugly hack that reaches into Tone's internal ._buffers or ._buffer to insert itself into .onload() callback.
+   * Tone has different ways to pull the onload callback from within to the API, so this implementation is very brittle.
+   * The sole reason for its existence is to handle async loaded state of Tone instruments that we allow to pass in from outside.
+   * If that option is eliminated, then this hacky function can be killed (or re-implemented via public onload API)
+   * @param toneObject Tone.js object (will work with non-Tone objects that have same loaded/onload properties)
+   * @param resolve onload callback
+   */
+  private checkToneLoaded(toneObject: any, resolve: () => void) {
+    const skipRecursion = toneObject instanceof Tone.Sampler; // Sampler has a Map of ToneAudioBuffer, and our method to find inner .onload() does not work since there is no single one.
+
+    // eslint-disable-next-line no-prototype-builtins
+    if ('loaded' in toneObject) {
+      if (toneObject.loaded) {
+        resolve();
+        return;
+      }
+      if (skipRecursion) {
+        return;
+      }
+      // Try Recursion into inner objects:
+      let handled = false;
+      ['buffer', '_buffer', '_buffers'].forEach(key => {
+        if (key in toneObject) {
+          this.checkToneLoaded(toneObject[key], resolve);
+          handled = true;
+        }
+      });
+      if (handled) {
+        return;
+      }
+    }
+
+    // Check object type if it has load/onload (and _buffers or _buffer), then call resolve()
+    // The list was created for Tone@14.8.0 by grepping and reviewing the source code.
+    // Known objecs to have:
+    const hasOnload =
+      toneObject instanceof Tone.ToneAudioBuffer ||
+      toneObject instanceof Tone.ToneBufferSource ||
+      // Falback for "future" objects
+      ('loaded' in toneObject && 'onload' in toneObject);
+
+    if (!hasOnload) {
+      // console.log('resolve() for ch "%o" idx %o onload NOT FOUND', this.name, this.idx);
+      // This is not a good assumption. E.g. it does not work for Tone.ToneAudioBuffers
+      resolve();
+    } else {
+      const oldOnLoad = toneObject.onload;
+      toneObject.onload = (obj: any) => {
+        if (oldOnLoad && typeof oldOnLoad === 'function') {
+          toneObject.onload = oldOnLoad;
+          oldOnLoad();
+        }
+        // console.log('resolve() for ch "%o" idx %o', this.name, this.idx);
+        resolve();
+      };
     }
   }
 
@@ -299,44 +361,52 @@ export class Channel {
             const synthName = (params.synth as SynthParams).synth;
             //  const presetName = (params.synth as SynthParams).presetName; // Unused here
             const preset = (params.synth as SynthParams).preset || {};
-            this.instrument = new Tone[synthName]({ ...preset, context });
+            this.instrument = new Tone[synthName]({
+              ...preset,
+              context,
+              onload: () => this.checkToneLoaded(this.instrument, resolve),
+              // This onload is ignored in all synths. Therefore we call checkToneLoaded() again below.
+            });
+            this.checkToneLoaded(this.instrument, resolve);
           } else {
-            params.instrument = params.synth;
+            this.instrument = params.synth;
             console.warn(
               'The "synth" parameter with instrument will be deprecated in the future. Please use the "instrument" parameter instead.'
             );
             // params.synth describing the Tone[params.synth.synth] is allowed.
+            this.checkToneLoaded(this.instrument, resolve);
           }
         } else if (typeof params.instrument === 'string') {
           this.instrument = new Tone[params.instrument]({ context });
+          this.checkToneLoaded(this.instrument, resolve);
         } else if (params.instrument) {
           this.instrument = params.instrument; // TODO: This is dangerous by-reference assignment. Tone.instrument has context that holds all other instruments. Client side params get polluted with circular references. If params come from e.g. react-ApolloClient data, Apollo tools crash on circular references.
+          this.checkToneLoaded(this.instrument, resolve);
         } else if (params.sample || params.buffer) {
           this.instrument = new Tone.Player({
             url: params.sample || params.buffer,
             context,
-            onload: () => {
-              // TODO: Tie the async Tone.Player loading completion (need some code untangling)
-            },
+            onload: () => this.checkToneLoaded(this.instrument, resolve),
           });
         } else if (params.samples) {
           this.instrument = new Tone.Sampler({
             urls: params.samples,
-            onload: () => {
-              // TODO: Tie the async Tone.Sampler loading completion (need some code untangling)
-            },
             context,
+            onload: () => this.checkToneLoaded(this.instrument, resolve),
           });
         } else if (params.sampler) {
           this.instrument = params.sampler;
+          this.checkToneLoaded(this.instrument, resolve);
         } else if (params.player) {
           this.instrument = params.player;
+          this.checkToneLoaded(this.instrument, resolve);
         } else if (params.external) {
           this.external = { ...params.external };
           this.instrument = {
             context,
             volume: { value: 0 },
           };
+          // Do not call! this.checkToneLoaded(this.instrument, resolve);
 
           if (params.external.init) {
             return params.external
@@ -360,6 +430,8 @@ export class Channel {
                   )
                 );
               });
+          } else {
+            resolve();
           }
         } else {
           throw new Error(
@@ -378,8 +450,6 @@ export class Channel {
         throw err; // I admit - I have no idea why reject(err) keeps going and upper .catch() does not strike.
         // Perhaps it is because code under try {} block is not async, but that is not a good explanation.
       }
-
-      resolve();
     });
   }
 
@@ -388,6 +458,7 @@ export class Channel {
     params: ChannelParams
   ): Promise<void> {
     context = context || Tone.getContext();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     return new Promise((resolve, reject) => {
       if (!params.external && this.instrument?.context !== context) {
         this.instrument = this.recreateToneObjectInContext(
