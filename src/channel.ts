@@ -43,6 +43,7 @@ export class Channel {
   private eventCbFn: EventFn | undefined;
 
   constructor(params: ChannelParams) {
+    let context = params.context || Tone.getContext();
     this.idx = params.idx || 0;
     this.name = params.name || 'ch ' + params.idx;
     this.activePatternIdx = -1;
@@ -62,18 +63,20 @@ export class Channel {
 
     this.hasLoaded = false;
     this.hasFailed = false;
-    this.initializerTask = this.initOutputProducer(undefined, params)
-      .then(() => {
-        this.hasLoaded = true;
-        this.eventCb('loaded', { channel: this }); // Report async load completion.
-      })
-      .catch(e => {
-        this.hasFailed = e;
-        console.error(
-          `${e.message} in channel ${this.idx} "${params.name ?? '(no name)'}"`
-        );
-        this.eventCb('error', { e, channel: this }); // Report async errors.
+    this.initializerTask = this.initOutputProducer(context, params).then(() => {
+      return this.initInstrument(context, params).then(() => {
+        return this.initEffects(context, params).then(() => {
+          this.hasLoaded = true;
+          this.eventCb('loaded', { channel: this }); // Report async load completion.
+        });
       });
+    }).catch(e => {
+      this.hasFailed = e;
+      console.error(
+        `${e.message} in channel ${this.idx} "${params.name ?? '(no name)'}"`
+      );
+      this.eventCb('error', { e, channel: this }); // Report async errors.
+    });
 
     params.clips.forEach((c: any, i: number) => {
       try {
@@ -232,6 +235,8 @@ export class Channel {
     toneObject: any, // Tone.PolySynth | Tone.Player | Tone.Sampler | Tone['' | '']
     context: any
   ): any {
+    // TODO: Implement onload methods and make async recreateToneObjectInContext()
+
     // Tone.PolySynth | Tone.Player | Tone.Sampler | Tone['' | '']
     if (toneObject instanceof Tone.PolySynth) {
       return new Tone.PolySynth(Tone[toneObject._dummyVoice.name], {
@@ -288,20 +293,18 @@ export class Channel {
               'Either synth or instrument can be provided, but not both.'
             );
           }
-          if (!(params.synth as SynthParams).synth) {
+          if ((params.synth as SynthParams).synth) {
+            const synthName = (params.synth as SynthParams).synth;
+            //  const presetName = (params.synth as SynthParams).presetName; // Unused here
+            const preset = (params.synth as SynthParams).preset || {};
+            this.instrument = new Tone[synthName]({ ...preset, context });
+          } else {
             params.instrument = params.synth;
             console.warn(
               'The "synth" parameter with instrument will be deprecated in the future. Please use the "instrument" parameter instead.'
             );
             // params.synth describing the Tone[params.synth.synth] is allowed.
           }
-        }
-
-        if (params.synth && (params.synth as SynthParams).synth) {
-          const synthName = (params.synth as SynthParams).synth;
-          //  const presetName = (params.synth as SynthParams).presetName; // Unused here
-          const preset = (params.synth as SynthParams).preset || {};
-          this.instrument = new Tone[synthName]({ ...preset, context });
         } else if (typeof params.instrument === 'string') {
           this.instrument = new Tone[params.instrument]({ context });
         } else if (params.instrument) {
@@ -332,6 +335,30 @@ export class Channel {
             context,
             volume: { value: 0 },
           };
+
+          if (params.external.init) {
+            return params.external
+              .init(context.rawContext)
+              .then(() => {
+                console.log(
+                  `Loaded external output module for channel idx ${
+                    this.idx
+                  } "${params.name ?? '(no name)'}"`
+                );
+                resolve();
+              })
+              .catch((e: any) => {
+                reject(
+                  new Error(
+                    `${
+                      e.message
+                    } loading external output module of channel idx ${
+                      this.idx
+                    }, ${params.name ?? '(no name)'}`
+                  )
+                );
+              });
+          }
         } else {
           throw new Error(
             'One of required synth|instrument|sample|sampler|samples|buffer|player|external is not provided!'
@@ -350,6 +377,35 @@ export class Channel {
         // Perhaps it is because code under try {} block is not async, but that is not a good explanation.
       }
 
+      resolve();
+    });
+  }
+
+  private async initInstrument(
+    context: any,
+    params: ChannelParams
+  ): Promise<void> {
+    context = context || Tone.getContext();
+    return new Promise((resolve, reject) => {
+      if (!params.external && this.instrument?.context !== context) {
+        this.instrument = this.recreateToneObjectInContext(
+          this.instrument,
+          context
+        );
+      }
+      if (params.volume) {
+        this.instrument.volume.value = params.volume;
+      }
+      resolve();
+    };
+  }
+
+  private async initEffects(
+    context: any,
+    params: ChannelParams
+  ): Promise<void> {
+    context = context || Tone.getContext();
+    return new Promise((resolve, reject) => {
       const createEffect = (eff: any) => {
         let effect: any;
         if (typeof eff === 'string') {
@@ -376,45 +432,14 @@ export class Channel {
         effects = params.effects.map(createEffect).map(startEffect);
       }
 
-      if (!params.external && this.instrument?.context !== context) {
-        this.instrument = this.recreateToneObjectInContext(
-          this.instrument,
-          context
-        );
-      }
-
-      if (params.volume) {
-        this.instrument.volume.value = params.volume;
-      }
-
       if (params.external) {
         if (effects.length !== 0) {
-          throw new Error('Effects cannot be used with external output');
+          const err = new Error('Effects cannot be used with external output');
+          reject(err);
+          throw err;
         }
       } else {
         this.instrument.chain(...effects).toDestination();
-      }
-
-      if (params.external && params.external.init) {
-        return params.external
-          .init(context.rawContext)
-          .then(() => {
-            console.log(
-              `Loaded external output module for channel idx ${
-                this.idx
-              } "${params.name ?? '(no name)'}"`
-            );
-            resolve();
-          })
-          .catch((e: any) => {
-            reject(
-              new Error(
-                `${e.message} loading external output module of channel idx ${
-                  this.idx
-                }, ${params.name ?? '(no name)'}`
-              )
-            );
-          });
       }
 
       resolve();

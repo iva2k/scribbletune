@@ -135,6 +135,11 @@ interface ChannelParams {
   clips?: any;
 
   /**
+   * Audio context (e.g. Tone.getContext())
+   */
+  context?: any;
+
+  /**
    * The default MIDI amplitube/ level/ volume of a note.
    * Used as the upper bound for accents and sizzles (where the lower bound is `accentLow`).
    *  - Default:  `100`
