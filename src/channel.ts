@@ -310,10 +310,16 @@ export class Channel {
           this.instrument = new Tone.Player({
             url: params.sample || params.buffer,
             context,
+            onload: () => {
+              // TODO: Tie the async Tone.Player loading completion (need some code untangling)
+            },
           });
         } else if (params.samples) {
           this.instrument = new Tone.Sampler({
             urls: params.samples,
+            onload: () => {
+              // TODO: Tie the async Tone.Sampler loading completion (need some code untangling)
+            },
             context,
           });
         } else if (params.sampler) {
