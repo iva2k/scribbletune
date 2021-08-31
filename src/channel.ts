@@ -33,9 +33,9 @@ export class Channel {
   name: string;
   activePatternIdx: number;
   channelClips: any;
-  player: any;
+  // player: any;
   instrument: any;
-  sampler: any;
+  // sampler: any;
   external: any;
   initializerTask: Promise<void>;
   hasLoaded: boolean; // if (!this.hasLoaded) - don't play this channel. Either still loading, or (initOutputProducer() rejected,
@@ -43,7 +43,6 @@ export class Channel {
   private eventCbFn: EventFn | undefined;
 
   constructor(params: ChannelParams) {
-    const context = params.context || Tone.getContext();
     this.idx = params.idx || 0;
     this.name = params.name || 'ch ' + params.idx;
     this.activePatternIdx = -1;
@@ -57,7 +56,8 @@ export class Channel {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { player, instrument, volume, ...params3 } = params2;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { eventCb, ...originalParamsFiltered } = params3;
+    const { eventCb, effects, ...params4 } = params3;
+    const { context = Tone.getContext(), ...originalParamsFiltered } = params4;
 
     this.eventCbFn = eventCb;
 
@@ -66,16 +66,18 @@ export class Channel {
     this.initializerTask = this.initOutputProducer(context, params)
       .then(() => {
         return this.initInstrument(context, params).then(() => {
-          return this.initEffects(context, params).then(() => {
-            this.hasLoaded = true;
-            this.eventCb('loaded', { channel: this }); // Report async load completion.
+          return this.adjustInstrument(context, params).then(() => {
+            return this.initEffects(context, params).then(() => {
+              this.hasLoaded = true;
+              this.eventCb('loaded', { channel: this }); // Report async load completion.
+            });
           });
         });
       })
       .catch(e => {
         this.hasFailed = e;
         console.error(
-          `${e.message} in channel ${this.idx} "${params.name ?? '(no name)'}"`
+          `${e.message} in channel ${this.idx} "${this.name ?? '(no name)'}"`
         );
         this.eventCb('error', { e, channel: this }); // Report async errors.
       });
@@ -108,14 +110,14 @@ export class Channel {
     // ? this.volume = volume;
 
     // Change volume of the player
-    if (this.player) {
-      this.player.volume.value = volume;
-    }
+    // if (this.player) {
+    //   this.player.volume.value = volume;
+    // }
 
     // Change volume of the sampler
-    if (this.sampler) {
-      this.sampler.volume.value = volume;
-    }
+    // if (this.sampler) {
+    //   this.sampler.volume.value = volume;
+    // }
 
     // Change volume of the instrument
     if (this.instrument) {
@@ -233,50 +235,6 @@ export class Channel {
     }
   }
 
-  private recreateToneObjectInContext(
-    toneObject: any, // Tone.PolySynth | Tone.Player | Tone.Sampler | Tone['' | '']
-    context: any
-  ): any {
-    // TODO: Implement onload methods and make async recreateToneObjectInContext()
-
-    // Tone.PolySynth | Tone.Player | Tone.Sampler | Tone['' | '']
-    if (toneObject instanceof Tone.PolySynth) {
-      return new Tone.PolySynth(Tone[toneObject._dummyVoice.name], {
-        ...toneObject.get(),
-        context,
-      });
-    } else if (toneObject instanceof Tone.Player) {
-      return new Tone.Player({
-        url: toneObject._buffer,
-        context,
-        // TODO: onload
-      });
-    } else if (toneObject instanceof Tone.Sampler) {
-      const { attack, curve, release, volume } = toneObject.get();
-      const paramsFromSampler = {
-        attack,
-        curve,
-        release,
-        volume,
-      };
-      const paramsFromBuffers = {
-        baseUrl: toneObject._buffers.baseUrl,
-        urls: Object.fromEntries(toneObject._buffers._buffers.entries()),
-      };
-      return new Tone.Sampler({
-        ...paramsFromSampler,
-        ...paramsFromBuffers,
-        context,
-        // TODO: onload
-      });
-    } else {
-      return new Tone[toneObject.name]({
-        ...toneObject.get(),
-        context,
-      });
-    }
-  }
-
   /**
    * Check Tone.js object loaded state and either invoke `resolve` right away, or attach to and wait using Tone onload cb.
    * It's an ugly hack that reaches into Tone's internal ._buffers or ._buffer to insert itself into .onload() callback.
@@ -286,7 +244,7 @@ export class Channel {
    * @param toneObject Tone.js object (will work with non-Tone objects that have same loaded/onload properties)
    * @param resolve onload callback
    */
-  private checkToneLoaded(toneObject: any, resolve: () => void) {
+  private checkToneObjLoaded(toneObject: any, resolve: () => void) {
     const skipRecursion = toneObject instanceof Tone.Sampler; // Sampler has a Map of ToneAudioBuffer, and our method to find inner .onload() does not work since there is no single one.
 
     // eslint-disable-next-line no-prototype-builtins
@@ -302,7 +260,7 @@ export class Channel {
       let handled = false;
       ['buffer', '_buffer', '_buffers'].forEach(key => {
         if (key in toneObject) {
-          this.checkToneLoaded(toneObject[key], resolve);
+          this.checkToneObjLoaded(toneObject[key], resolve);
           handled = true;
         }
       });
@@ -326,7 +284,7 @@ export class Channel {
       resolve();
     } else {
       const oldOnLoad = toneObject.onload;
-      toneObject.onload = (obj: any) => {
+      toneObject.onload = () => {
         if (oldOnLoad && typeof oldOnLoad === 'function') {
           toneObject.onload = oldOnLoad;
           oldOnLoad();
@@ -337,186 +295,238 @@ export class Channel {
     }
   }
 
-  private async initOutputProducer(
-    context: any,
-    params: ChannelParams
-  ): Promise<void> {
-    context = context || Tone.getContext();
-    return new Promise((resolve, reject) => {
-      try {
-        /*
-         *  1. The params object can be used to pass a sample (sound source) OR a synth(Synth/FMSynth/AMSynth etc) or samples.
-         *  Scribbletune will then create a Tone.js Player or Tone.js Instrument or Tone.js Sampler respectively
-         *  2. It can also be used to pass a Tone.js Player object or instrument that was created elsewhere
-         *  (mostly by Scribbletune itself in the channel creation method)
-         **/
-
-        if (params.synth) {
-          if (params.instrument) {
-            throw new Error(
-              'Either synth or instrument can be provided, but not both.'
-            );
-          }
-          if ((params.synth as SynthParams).synth) {
-            const synthName = (params.synth as SynthParams).synth;
-            //  const presetName = (params.synth as SynthParams).presetName; // Unused here
-            const preset = (params.synth as SynthParams).preset || {};
-            this.instrument = new Tone[synthName]({
-              ...preset,
-              context,
-              onload: () => this.checkToneLoaded(this.instrument, resolve),
-              // This onload is ignored in all synths. Therefore we call checkToneLoaded() again below.
-            });
-            this.checkToneLoaded(this.instrument, resolve);
-          } else {
-            this.instrument = params.synth;
-            console.warn(
-              'The "synth" parameter with instrument will be deprecated in the future. Please use the "instrument" parameter instead.'
-            );
-            // params.synth describing the Tone[params.synth.synth] is allowed.
-            this.checkToneLoaded(this.instrument, resolve);
-          }
-        } else if (typeof params.instrument === 'string') {
-          this.instrument = new Tone[params.instrument]({ context });
-          this.checkToneLoaded(this.instrument, resolve);
-        } else if (params.instrument) {
-          this.instrument = params.instrument; // TODO: This is dangerous by-reference assignment. Tone.instrument has context that holds all other instruments. Client side params get polluted with circular references. If params come from e.g. react-ApolloClient data, Apollo tools crash on circular references.
-          this.checkToneLoaded(this.instrument, resolve);
-        } else if (params.sample || params.buffer) {
-          this.instrument = new Tone.Player({
-            url: params.sample || params.buffer,
-            context,
-            onload: () => this.checkToneLoaded(this.instrument, resolve),
-          });
-        } else if (params.samples) {
-          this.instrument = new Tone.Sampler({
-            urls: params.samples,
-            context,
-            onload: () => this.checkToneLoaded(this.instrument, resolve),
-          });
-        } else if (params.sampler) {
-          this.instrument = params.sampler;
-          this.checkToneLoaded(this.instrument, resolve);
-        } else if (params.player) {
-          this.instrument = params.player;
-          this.checkToneLoaded(this.instrument, resolve);
-        } else if (params.external) {
-          this.external = { ...params.external };
-          this.instrument = {
-            context,
-            volume: { value: 0 },
-          };
-          // Do not call! this.checkToneLoaded(this.instrument, resolve);
-
-          if (params.external.init) {
-            return params.external
-              .init(context.rawContext)
-              .then(() => {
-                console.log(
-                  `Loaded external output module for channel idx ${
-                    this.idx
-                  } "${params.name ?? '(no name)'}"`
-                );
-                resolve();
-              })
-              .catch((e: any) => {
-                reject(
-                  new Error(
-                    `${
-                      e.message
-                    } loading external output module of channel idx ${
-                      this.idx
-                    }, ${params.name ?? '(no name)'}`
-                  )
-                );
-              });
-          } else {
-            resolve();
-          }
-        } else {
-          throw new Error(
-            'One of required synth|instrument|sample|sampler|samples|buffer|player|external is not provided!'
-          );
-        }
-
-        if (!this.instrument) {
-          throw new Error('Failed instantiating instrument from given params.');
-        }
-      } catch (e) {
-        const err = new Error(
-          `${e.message} in channel ${this.idx} "${params.name ?? '(no name)'}"`
-        );
-        reject(err);
-        throw err; // I admit - I have no idea why reject(err) keeps going and upper .catch() does not strike.
-        // Perhaps it is because code under try {} block is not async, but that is not a good explanation.
-      }
-    });
-  }
-
-  private async initInstrument(
-    context: any,
-    params: ChannelParams
-  ): Promise<void> {
+  private recreateToneObjectInContext(
+    toneObject: any, // Tone.PolySynth | Tone.Player | Tone.Sampler | Tone['' | '']
+    context: any
+  ): Promise<any> {
     context = context || Tone.getContext();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    return new Promise((resolve, reject) => {
-      if (!params.external && this.instrument?.context !== context) {
-        this.instrument = this.recreateToneObjectInContext(
-          this.instrument,
-          context
+    return new Promise<any>((resolve, reject) => {
+      // Tone.PolySynth | Tone.Player | Tone.Sampler | Tone['' | '']
+      if (toneObject instanceof Tone.PolySynth) {
+        const newObj = Tone.PolySynth(Tone[toneObject._dummyVoice.name], {
+          ...toneObject.get(),
+          context,
+        });
+        this.checkToneObjLoaded(newObj, () => resolve(newObj));
+      } else if (toneObject instanceof Tone.Player) {
+        const newObj = Tone.Player({
+          url: toneObject._buffer,
+          context,
+          onload: () => this.checkToneObjLoaded(newObj, () => resolve(newObj)),
+        });
+      } else if (toneObject instanceof Tone.Sampler) {
+        const { attack, curve, release, volume } = toneObject.get();
+        const paramsFromSampler = {
+          attack,
+          curve,
+          release,
+          volume,
+        };
+        const paramsFromBuffers = {
+          baseUrl: toneObject._buffers.baseUrl,
+          urls: Object.fromEntries(toneObject._buffers._buffers.entries()),
+        };
+        const newObj = Tone.Sampler({
+          ...paramsFromSampler,
+          ...paramsFromBuffers,
+          context,
+          onload: () => this.checkToneObjLoaded(newObj, () => resolve(newObj)),
+        });
+      } else {
+        const newObj = Tone[toneObject.name]({
+          ...toneObject.get(),
+          context,
+          onload: () => this.checkToneObjLoaded(newObj, () => resolve(newObj)),
+        });
+        this.checkToneObjLoaded(newObj, () => resolve(newObj));
+      }
+    });
+  }
+
+  private initOutputProducer(
+    context: any,
+    params: ChannelParams
+  ): Promise<void> {
+    context = context || Tone.getContext();
+    return new Promise<void>((resolve, reject) => {
+      /*
+       *  1. The params object can be used to pass a sample (sound source) OR a synth(Synth/FMSynth/AMSynth etc) or samples.
+       *  Scribbletune will then create a Tone.js Player or Tone.js Instrument or Tone.js Sampler respectively
+       *  2. It can also be used to pass a Tone.js Player object or instrument that was created elsewhere
+       *  (mostly by Scribbletune itself in the channel creation method)
+       **/
+
+      if (params.synth) {
+        if (params.instrument) {
+          throw new Error(
+            'Either synth or instrument can be provided, but not both.'
+          );
+        }
+        if ((params.synth as SynthParams).synth) {
+          const synthName = (params.synth as SynthParams).synth;
+          //  const presetName = (params.synth as SynthParams).presetName; // Unused here
+          const preset = (params.synth as SynthParams).preset || {};
+          this.instrument = new Tone[synthName]({
+            ...preset,
+            context,
+            // Use onload for cases when synthName calls out Tone.Sample/Player/Sampler.
+            // It could be a universal way to load Tone.js instruments.
+            onload: () => this.checkToneObjLoaded(this.instrument, resolve),
+            // This onload is ignored in all synths. Therefore we call checkToneObjLoaded() again below.
+            // It is safe to call resolve() multiple times for Promise<void>
+          });
+          this.checkToneObjLoaded(this.instrument, resolve);
+        } else {
+          this.instrument = params.synth;
+          console.warn(
+            'The "synth" parameter with instrument will be deprecated in the future. Please use the "instrument" parameter instead.'
+          );
+          // params.synth describing the Tone[params.synth.synth] is allowed.
+          this.checkToneObjLoaded(this.instrument, resolve);
+        }
+      } else if (typeof params.instrument === 'string') {
+        this.instrument = new Tone[params.instrument]({ context });
+        this.checkToneObjLoaded(this.instrument, resolve);
+      } else if (params.instrument) {
+        this.instrument = params.instrument; // TODO: This is dangerous by-reference assignment. Tone.instrument has context that holds all other instruments. Client side params get polluted with circular references. If params come from e.g. react-ApolloClient data, Apollo tools crash on circular references.
+        this.checkToneObjLoaded(this.instrument, resolve);
+      } else if (params.sample || params.buffer) {
+        this.instrument = new Tone.Player({
+          url: params.sample || params.buffer,
+          context,
+          onload: () => this.checkToneObjLoaded(this.instrument, resolve),
+        });
+      } else if (params.samples) {
+        this.instrument = new Tone.Sampler({
+          urls: params.samples,
+          context,
+          onload: () => this.checkToneObjLoaded(this.instrument, resolve),
+        });
+      } else if (params.sampler) {
+        this.instrument = params.sampler;
+        this.checkToneObjLoaded(this.instrument, resolve);
+      } else if (params.player) {
+        this.instrument = params.player;
+        this.checkToneObjLoaded(this.instrument, resolve);
+      } else if (params.external) {
+        this.external = { ...params.external };
+        this.instrument = {
+          context,
+          volume: { value: 0 },
+        };
+        // Do not call! this.checkToneObjLoaded(this.instrument, resolve);
+
+        if (params.external.init) {
+          return params.external
+            .init(context.rawContext)
+            .then(() => {
+              console.log(
+                `Loaded external output module for channel idx ${
+                  this.idx
+                } "${this.name ?? '(no name)'}"`
+              );
+              resolve();
+            })
+            .catch((e: any) => {
+              reject(
+                new Error(
+                  `${e.message} loading external output module of channel idx ${
+                    this.idx
+                  }, ${this.name ?? '(no name)'}`
+                )
+              );
+            });
+        } else {
+          resolve();
+        }
+      } else {
+        throw new Error(
+          'One of required synth|instrument|sample|sampler|samples|buffer|player|external is not provided!'
         );
       }
+
+      if (!this.instrument) {
+        throw new Error('Failed instantiating instrument from given params.');
+      }
+    });
+  }
+
+  private initInstrument(context: any, params: ChannelParams): Promise<void> {
+    context = context || Tone.getContext();
+    if (!params.external && this.instrument?.context !== context) {
+      return this.recreateToneObjectInContext(this.instrument, context).then(
+        newObj => {
+          this.instrument = newObj;
+        }
+      );
+    } else {
+      // Nothing to do
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      return new Promise<void>((resolve, reject) => {
+        resolve();
+      });
+    }
+  }
+
+  private adjustInstrument(context: any, params: ChannelParams): Promise<void> {
+    context = context || Tone.getContext();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    return new Promise<void>((resolve, reject) => {
       if (params.volume) {
-        this.instrument.volume.value = params.volume;
+        // this.instrument.volume.value = params.volume;
+        this.setVolume(params.volume);
       }
       resolve();
     });
   }
 
-  private async initEffects(
-    context: any,
-    params: ChannelParams
-  ): Promise<void> {
+  private initEffects(context: any, params: ChannelParams): Promise<void> {
     context = context || Tone.getContext();
-    return new Promise((resolve, reject) => {
-      const createEffect = (eff: any) => {
-        let effect: any;
-        if (typeof eff === 'string') {
-          effect = new Tone[eff]({
-            context,
-          });
-        } else if (eff.context !== context) {
-          effect = this.recreateToneObjectInContext(eff, context);
+
+    const createEffect = (effect: any): Promise<any> => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      return new Promise<any>((resolve, reject) => {
+        if (typeof effect === 'string') {
+          resolve(new Tone[effect]({ context }));
+        } else if (effect.context !== context) {
+          return this.recreateToneObjectInContext(effect, context);
         } else {
-          effect = eff;
+          resolve(effect);
         }
+      }).then(effect => {
         return effect.toDestination();
-      };
+      });
+    };
 
-      const startEffect = (eff: any) => {
-        return typeof eff.start === 'function' ? eff.start() : eff;
-      };
+    const startEffect = (eff: any) => {
+      return typeof eff.start === 'function' ? eff.start() : eff;
+    };
 
-      let effects = [];
-      if (params.effects) {
-        if (!Array.isArray(params.effects)) {
-          params.effects = [params.effects];
-        }
-        effects = params.effects.map(createEffect).map(startEffect);
+    const toArray = (someVal: any): any[] => {
+      if (!someVal) {
+        return [];
       }
+      if (Array.isArray(someVal)) {
+        return someVal;
+      }
+      return [someVal];
+    };
 
-      if (params.external) {
-        if (effects.length !== 0) {
-          const err = new Error('Effects cannot be used with external output');
-          reject(err);
-          throw err;
-        }
-      } else {
+    const effectsIn = toArray(params.effects);
+    if (params.external) {
+      if (effectsIn.length !== 0) {
+        throw new Error('Effects cannot be used with external output');
+      }
+      return Promise.resolve();
+    }
+
+    // effects = params.effects.map(createEffect).map(startEffect);
+    return Promise.all(effectsIn.map(createEffect))
+      .then(results => results.map(startEffect))
+      .then(effects => {
         this.instrument.chain(...effects).toDestination();
-      }
-
-      resolve();
-    });
+      });
   }
 
   get clips(): any[] {
