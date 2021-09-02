@@ -1,4 +1,5 @@
 import { clip, getNote, getDuration } from './browser-clip';
+import { errorHasMessage } from './utils';
 
 /**
  * Get the next logical position to play in the session
@@ -74,7 +75,7 @@ export class Channel {
     // End Async section
 
     // Sync section
-    let clipsFailed = false;
+    let clipsFailed: { message: string } | false = false;
     try {
       params.clips.forEach((c: any, i: number) => {
         try {
@@ -84,11 +85,13 @@ export class Channel {
           });
         } catch (e) {
           // Annotate the error with Clip info
-          throw new Error(`${e.message} in clip ${i + 1}`);
+          throw new Error(
+            `${errorHasMessage(e) ? e.message : e} in clip ${i + 1}`
+          );
         }
       }, this);
     } catch (e) {
-      clipsFailed = e; // Stash the error
+      clipsFailed = e as { message: string }; // Stash the error
     }
     // End Sync section
 

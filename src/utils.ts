@@ -105,3 +105,7 @@ export const dice = (): boolean => !!Math.round(Math.random());
  */
 export const flat = (arr: any[][]): any[] =>
   arr.reduce((acc, val) => acc.concat(val), []);
+
+export const errorHasMessage = (x: any): x is { message: string } => {
+  return typeof x.message === 'string';
+};

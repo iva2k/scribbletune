@@ -1,4 +1,5 @@
 import { inlineChord } from 'harmonics';
+import { errorHasMessage } from './utils';
 
 const DEFAULT_OCTAVE = 4;
 
@@ -99,7 +100,9 @@ export const arp = (chordsOrParams: string | Params): any[] => {
           .map((idx: any) => filledArr[idx]);
         finalArr = [...finalArr, ...reorderedArr];
       } catch (e) {
-        throw new Error(`${e.message} chord ${i + 1} "${c}"`);
+        throw new Error(
+          `${errorHasMessage(e) ? e.message : e} in chord ${i + 1} "${c}"`
+        );
       }
     });
   } else {
