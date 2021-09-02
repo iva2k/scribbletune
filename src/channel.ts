@@ -516,8 +516,8 @@ export class Channel {
         } else {
           resolve(effect);
         }
-      }).then(effect => {
-        return effect.toDestination();
+      }).then(effectOut => {
+        return effectOut.toDestination();
       });
     };
 
