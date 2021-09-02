@@ -39,8 +39,8 @@ type Params = {
 
 /**
  *
- * @param chordsOrParams a string that denotes comma separated chords to be used or an object with additional properties
- * By default, if this is a string, the the count of notes generated is 8 and the order is ascending.
+ * @param chordsOrParams a string that denotes space (comma?) separated chords to be used or an object with additional properties
+ * By default, if this is a string, the count of notes generated is 8 and the order is ascending.
  * For instance arp('CM FM') will result in an array of notes [C4, E4, G4, F4, A4, C4, C5, E5]
  * You can even provide Params as an object.
  * For e.g. arp({count: 8, order: '10325476', chords: 'FM_4 Gm7b5_4 AbM_4 Bbm_4 Cm_5 DbM_5 EbM_5})

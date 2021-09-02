@@ -61,36 +61,58 @@ export class Channel {
 
     this.eventCbFn = eventCb;
 
+    // Async section
     this.hasLoaded = false;
     this.hasFailed = false;
-    this.initializerTask = this.initOutputProducer(context, params)
-      .then(() => {
-        return this.initInstrument(context, params).then(() => {
-          return this.adjustInstrument(context, params).then(() => {
-            return this.initEffects(context, params).then(() => {
-              this.hasLoaded = true;
-              this.eventCb('loaded', { channel: this }); // Report async load completion.
-            });
-          });
+    this.initializerTask = this.initOutputProducer(context, params).then(() => {
+      return this.initInstrument(context, params).then(() => {
+        return this.adjustInstrument(context, params).then(() => {
+          return this.initEffects(context, params);
         });
+      });
+    });
+    // End Async section
+
+    // Sync section
+    let clipsFailed = false;
+    try {
+      params.clips.forEach((c: any, i: number) => {
+        try {
+          this.addClip({
+            ...c,
+            ...originalParamsFiltered,
+          });
+        } catch (e) {
+          // Annotate the error with Clip info
+          throw new Error(`${e.message} in clip ${i + 1}`);
+        }
+      }, this);
+    } catch (e) {
+      clipsFailed = e; // Stash the error
+    }
+    // End Sync section
+
+    // Reconcile sync section with async section
+    this.initializerTask
+      .then(() => {
+        if (clipsFailed) {
+          throw clipsFailed;
+        }
+        this.hasLoaded = true;
+        this.eventCb('loaded', {
+          channel: this,
+        }); // Report async load completion.
       })
       .catch(e => {
         this.hasFailed = e;
         console.error(
           `${e.message} in channel ${this.idx} "${this.name ?? '(no name)'}"`
         );
-        this.eventCb('error', { e, channel: this }); // Report async errors.
+        this.eventCb('error', {
+          e,
+          channel: this,
+        }); // Report async errors.
       });
-
-    params.clips.forEach((c: any, i: number) => {
-      try {
-        this.addClip({ ...c, ...originalParamsFiltered });
-      } catch (e) {
-        throw new Error(
-          `${e.message} in channel ${this.idx} "${params?.name}" clip ${i + 1}`
-        );
-      }
-    }, this);
   }
 
   static startTransport(): void {
