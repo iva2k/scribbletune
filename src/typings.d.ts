@@ -214,7 +214,14 @@ interface ChannelParams {
    */
   volume?: number;
 
+  /**
+   * Callback function triggered when a note is played.
+   */
   eventCb?: EventFn;
+  /**
+   * Callback function triggered when a note is played.
+   */
+  playerCb?: playerObserverFnc;
 }
 
 type ChannelPattern = {
@@ -257,7 +264,18 @@ interface PlayParams {
 
 type SeqFn = (time: string, el: string) => void;
 
+/**
+ * Callback function triggered when channel has a new event.
+ * @param event - one of ['loaded', 'error']
+ * @param params - object with event data
+ */
 type EventFn = (event: string, params: any) => void;
+
+/**
+ * Callback function triggered when a note is played.
+ * @param params - object with player data
+ */
+type playerObserverFnc = (params: any) => void;
 
 declare let Tone: any;
 declare let LiveAPI: any;

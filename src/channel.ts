@@ -34,20 +34,21 @@ export class Channel {
   name: string;
   activePatternIdx: number;
   channelClips: any;
-  // player: any;
+  clipNoteCount: number;
   instrument: any;
-  // sampler: any;
   external: any;
   initializerTask: Promise<void>;
   hasLoaded: boolean; // if (!this.hasLoaded) - don't play this channel. Either still loading, or (initOutputProducer() rejected,
   hasFailed: boolean | Error;
   private eventCbFn: EventFn | undefined;
+  private playerCbFn: playerObserverFnc | undefined;
 
   constructor(params: ChannelParams) {
     this.idx = params.idx || 0;
     this.name = params.name || 'ch ' + params.idx;
     this.activePatternIdx = -1;
     this.channelClips = [];
+    this.clipNoteCount = 0;
 
     // Filter out unrequired params and create clip params object
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -57,10 +58,11 @@ export class Channel {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { player, instrument, volume, ...params3 } = params2;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { eventCb, effects, ...params4 } = params3;
+    const { eventCb, playerCb, effects, ...params4 } = params3;
     const { context = Tone.getContext(), ...originalParamsFiltered } = params4;
 
     this.eventCbFn = eventCb;
+    this.playerCbFn = playerCb;
 
     // Async section
     this.hasLoaded = false;
@@ -102,19 +104,14 @@ export class Channel {
           throw clipsFailed;
         }
         this.hasLoaded = true;
-        this.eventCb('loaded', {
-          channel: this,
-        }); // Report async load completion.
+        this.eventCb('loaded', {}); // Report async load completion.
       })
       .catch(e => {
         this.hasFailed = e;
         console.error(
           `${e.message} in channel ${this.idx} "${this.name ?? '(no name)'}"`
         );
-        this.eventCb('error', {
-          e,
-          channel: this,
-        }); // Report async errors.
+        this.eventCb('error', { e }); // Report async errors.
       });
   }
 
@@ -163,6 +160,7 @@ export class Channel {
     }
 
     if (this.channelClips[idx] && this.channelClips[idx].state !== 'started') {
+      this.clipNoteCount = 0;
       this.activePatternIdx = idx;
       this.channelClips[idx].start(position);
     }
@@ -196,24 +194,29 @@ export class Channel {
    * @return {Function} function that can be used as the callback in Tone.Sequence https://tonejs.github.io/docs/Sequence
    */
   getSeqFn(params: ClipParams): SeqFn {
-    let counter = 0;
     if (this.external) {
       return (time: string, el: string) => {
-        if (this.hasLoaded && (el === 'x' || el === 'R')) {
-          const duration = Tone.Time(getDuration(params, counter)).toSeconds();
-          this.external.triggerAttackRelease?.(
-            getNote(el, params, counter)[0],
-            duration,
-            time
-          );
-          counter++;
+        if (el === 'x' || el === 'R') {
+          const counter = this.clipNoteCount;
+          if (this.hasLoaded) {
+            const note = getNote(el, params, counter)[0];
+            const duration = getDuration(params, counter);
+            const durSeconds = Tone.Time(duration).toSeconds();
+            this.playerCb({ note, duration, time, counter });
+            this.external.triggerAttackRelease?.(note, durSeconds, time);
+          }
+          this.clipNoteCount++;
         }
       };
     } else if (this.instrument instanceof Tone.Player) {
       return (time: string, el: string) => {
-        if (this.hasLoaded && (el === 'x' || el === 'R')) {
-          this.instrument.start(time);
-          counter++;
+        if (el === 'x' || el === 'R') {
+          const counter = this.clipNoteCount;
+          if (this.hasLoaded) {
+            this.playerCb({ note: '', duration: '', time, counter });
+            this.instrument.start(time);
+          }
+          this.clipNoteCount++;
         }
       };
     } else if (
@@ -221,34 +224,40 @@ export class Channel {
       this.instrument instanceof Tone.Sampler
     ) {
       return (time: string, el: string) => {
-        if (this.hasLoaded && (el === 'x' || el === 'R')) {
-          this.instrument.triggerAttackRelease(
-            getNote(el, params, counter),
-            getDuration(params, counter),
-            time
-          );
-          counter++;
+        if (el === 'x' || el === 'R') {
+          const counter = this.clipNoteCount;
+          if (this.hasLoaded) {
+            const note = getNote(el, params, counter);
+            const duration = getDuration(params, counter);
+            this.playerCb({ note, duration, time, counter });
+            this.instrument.triggerAttackRelease(note, duration, time);
+          }
+          this.clipNoteCount++;
         }
       };
     } else if (this.instrument instanceof Tone.NoiseSynth) {
       return (time: string, el: string) => {
-        if (this.hasLoaded && (el === 'x' || el === 'R')) {
-          this.instrument.triggerAttackRelease(
-            getDuration(params, counter),
-            time
-          );
-          counter++;
+        if (el === 'x' || el === 'R') {
+          const counter = this.clipNoteCount;
+          if (this.hasLoaded) {
+            const duration = getDuration(params, counter);
+            this.playerCb({ note: '', duration, time, counter });
+            this.instrument.triggerAttackRelease(duration, time);
+          }
+          this.clipNoteCount++;
         }
       };
     } else {
       return (time: string, el: string) => {
-        if (this.hasLoaded && (el === 'x' || el === 'R')) {
-          this.instrument.triggerAttackRelease(
-            getNote(el, params, counter)[0],
-            getDuration(params, counter),
-            time
-          );
-          counter++;
+        if (el === 'x' || el === 'R') {
+          const counter = this.clipNoteCount;
+          if (this.hasLoaded) {
+            const note = getNote(el, params, counter)[0];
+            const duration = getDuration(params, counter);
+            this.playerCb({ note, duration, time, counter });
+            this.instrument.triggerAttackRelease(note, duration, time);
+          }
+          this.clipNoteCount++;
         }
       };
     }
@@ -256,7 +265,15 @@ export class Channel {
 
   private eventCb(event: string, params: any): void {
     if (typeof this.eventCbFn === 'function') {
+      params.channel = this;
       this.eventCbFn(event, params);
+    }
+  }
+
+  private playerCb(params: any): void {
+    if (typeof this.playerCbFn === 'function') {
+      params.channel = this;
+      this.playerCbFn(params);
     }
   }
 
