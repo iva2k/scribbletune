@@ -1,5 +1,4 @@
-import { isNote, shuffle, expandStr } from './utils';
-import { inlineChord } from 'harmonics';
+import { convertChordsToNotes, randomInt, shuffle, expandStr } from './utils';
 
 /**
  * Get default params for a clip, such as root note, pattern etc
@@ -36,37 +35,6 @@ const hdr: NVP<number> = {
   '8n': 64,
   '16n': 32,
 };
-
-const convertChordsToNotes = (el: any) => {
-  if (isNote(el as string)) {
-    // A note needs to be an array so that it can accomodate chords or single notes with a single interface
-    return [el];
-  }
-
-  if (Array.isArray(el)) {
-    // This could be a chord provided as an array
-    // make sure it uses valid notes
-    el.forEach(n => {
-      if (!isNote(n)) {
-        throw new TypeError('array must comprise valid notes');
-      }
-    });
-
-    return el;
-  }
-
-  // At this point, this could be an inline chord e.g. Cmaj7 or Dbsus2_5
-  if (!Array.isArray(el)) {
-    const c = inlineChord(el);
-    if (c && c.length) {
-      return c;
-    }
-  }
-
-  throw new Error(`Chord ${el} not found`);
-};
-
-const randomInt = (num = 1) => Math.round(Math.random() * num);
 
 export const clip = (params: ClipParams): any => {
   params = { ...getDefaultParams(), ...(params || {}) };

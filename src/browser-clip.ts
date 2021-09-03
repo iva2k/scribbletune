@@ -1,6 +1,6 @@
 import { Channel } from './channel';
-import { isNote, shuffle, expandStr } from './utils';
-import { chord } from 'harmonics';
+import { convertChordsToNotes, randomInt, shuffle, expandStr } from './utils';
+
 const defaultSubdiv = '4n';
 const defaultDur = '8n';
 
@@ -40,36 +40,6 @@ const hdr: NVP<number> = {
   '16n': 32,
 };
 /* */
-
-const convertChordsToNotes = (el: any) => {
-  if (isNote(el as string)) {
-    // A note needs to be an array so that it can accomodate chords or single notes with a single interface
-    return [el];
-  }
-
-  if (Array.isArray(el)) {
-    // This could be a chord provided as an array
-    // make sure it uses valid notes
-    el.forEach(n => {
-      if (!isNote(n)) {
-        throw new TypeError('array must comprise valid notes');
-      }
-    });
-
-    return el;
-  }
-
-  if (!Array.isArray(el)) {
-    const c = chord(el);
-    if (c && c.length) {
-      return c;
-    }
-  }
-
-  throw new Error(`Chord ${el} not found`);
-};
-
-const randomInt = (num = 1) => Math.round(Math.random() * num);
 
 export const getNote = (
   el: string,
