@@ -167,19 +167,20 @@ export const convertChordsToNotes = (
       if (Array.isArray(n)) {
         // TODO: Can we convert it to something useful?
         // make sure it uses valid notes
-        // n.forEach(n1 => {
-        //   if (typeof el !== 'string' || !isNote(n1)) {
-        //     throw new TypeError('array must comprise valid notes');
-        //   }
-        // });
-        throw new TypeError('cannot decode array of arrays');
-      } else if (typeof el !== 'string' || !isNote(n)) {
+        n.forEach(n1 => {
+          if (typeof n1 !== 'string' || !isNote(n1)) {
+            throw new TypeError('array of arrays must comprise valid notes');
+          }
+        });
+        // throw new TypeError('cannot decode array of arrays');
+      } else if (typeof n !== 'string' || !isNote(n)) {
         // make sure it uses valid notes
         throw new TypeError('array must comprise valid notes');
       }
     });
 
     return el as string[];
+    // ? return el as (string | string[])[];
   }
 
   if (!Array.isArray(el)) {
