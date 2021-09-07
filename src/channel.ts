@@ -115,6 +115,10 @@ export class Channel {
       });
   }
 
+  static setTransportTempo(valueBpm: number): void {
+    Tone.Transport.bpm.value = valueBpm;
+  }
+
   static startTransport(): void {
     Tone.start();
     Tone.Transport.start();

@@ -46,6 +46,10 @@ export class Session {
     return this.sessionChannels;
   }
 
+  setTransportTempo(valueBpm: number): void {
+    Channel.setTransportTempo(valueBpm);
+  }
+
   startTransport(): void {
     Channel.startTransport();
   }
