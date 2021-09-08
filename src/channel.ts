@@ -166,13 +166,13 @@ export class Channel {
     if (this.channelClips[idx] && this.channelClips[idx].state !== 'started') {
       this.clipNoteCount = 0;
       this.activePatternIdx = idx;
-      this.channelClips[idx].start(position);
+      this.channelClips[idx]?.start(position);
     }
   }
 
   stopClip(idx: number, position?: number | string): void {
     position = position || (position === 0 ? 0 : getNextPos());
-    this.channelClips[idx].stop(position);
+    this.channelClips[idx]?.stop(position);
     if (idx === this.activePatternIdx) {
       this.activePatternIdx = -1;
     }
